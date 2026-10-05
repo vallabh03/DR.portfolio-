@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, NavLink } from 'react-router'
 import { doctor, isPlaceholder } from '../data/doctor'
-import { BOOK_PATH, sections } from '../data/navigation'
+import { BOOK_PATH, BOOK_TITLE, navRoutes } from '../data/navigation'
 import LegalDialog, { type LegalDoc } from './LegalDialog'
-import { ArrowRight } from './Button'
+import { ArrowRight, ArrowUp } from './Button'
 
-/** Editorial footer shown on every page. */
+/** Editorial footer shared by every page. */
 export default function Footer() {
   const [legal, setLegal] = useState<LegalDoc | null>(null)
   const year = new Date().getFullYear()
   const { contact } = doctor
+  const links = [...navRoutes, { path: BOOK_PATH, label: BOOK_TITLE }]
 
   return (
     <footer className="border-t border-line bg-surface">
@@ -19,19 +20,23 @@ export default function Footer() {
             <p className="font-serif text-[clamp(2rem,1.6rem+1.6vw,2.75rem)] leading-[1.05] tracking-[-0.02em]">{doctor.name}</p>
             <p className={`mt-3 ${isPlaceholder(doctor.title) ? 'text-muted' : ''}`}>{doctor.title}</p>
             <Link to={BOOK_PATH} className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-              <span className="link-underline">Book a consultation</span>
+              <span className="link-underline">{BOOK_TITLE}</span>
               <ArrowRight />
             </Link>
           </div>
 
           <nav aria-label="Footer" className="md:col-span-3">
-            <h2 className="label mb-4">Sections</h2>
+            <h2 className="label mb-4">Pages</h2>
             <ul className="grid grid-cols-2 gap-x-6 md:grid-cols-1">
-              {sections.map((s) => (
-                <li key={s.id}>
-                  <Link to={`/#${s.id}`} className="flex min-h-11 items-center text-fg/85 hover:text-fg">
-                    <span className="link-underline">{s.label}</span>
-                  </Link>
+              {links.map((l) => (
+                <li key={l.path}>
+                  <NavLink
+                    to={l.path}
+                    end={l.path === '/'}
+                    className={({ isActive }) => `flex min-h-11 items-center ${isActive ? 'text-accent' : 'text-fg/85 hover:text-fg'}`}
+                  >
+                    <span className="link-underline">{l.label}</span>
+                  </NavLink>
                 </li>
               ))}
             </ul>
@@ -76,8 +81,9 @@ export default function Footer() {
             <button type="button" className="min-h-11 hover:text-fg" onClick={() => setLegal('terms')}>
               <span className="link-underline">Terms</span>
             </button>
-            <button type="button" className="min-h-11 hover:text-fg" onClick={() => window.scrollTo({ top: 0 })}>
-              <span className="link-underline">Back to top ↑</span>
+            <button type="button" className="inline-flex min-h-11 items-center gap-1.5 hover:text-fg" onClick={() => window.scrollTo({ top: 0 })}>
+              <span className="link-underline">Back to top</span>
+              <ArrowUp />
             </button>
           </div>
         </div>

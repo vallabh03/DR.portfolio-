@@ -12,4 +12,18 @@ Until a file exists, the site shows an abstract, theme-aware placeholder (never 
 | research.jpg | Research | 1600×900 |
 | credential-01.jpg | Credentials | 1600×1000 |
 
-Export as progressive JPEG (quality ~75–80) or add a `.webp` and update the path in `src/data/doctor.ts`.
+Export originals as high-quality JPEG (or PNG), at least the suggested size.
+
+## Optimising
+
+After adding or replacing a photograph, run:
+
+```
+npm run images
+```
+
+This writes AVIF and WebP versions at 640 / 960 / 1280 / 1920px (never upscaled)
+to `public/images/optimized/`, and records each image's intrinsic size in
+`src/data/image-manifest.json`. The site then serves the smallest suitable
+AVIF/WebP automatically via `<picture>` + `srcset`, with width/height set so the
+layout never shifts. Originals are not modified and remain the fallback.

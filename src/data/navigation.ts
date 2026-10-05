@@ -3,27 +3,37 @@ import { doctor } from './doctor'
 /** Testimonials appear only once real, patient-approved testimonials exist. */
 export const showTestimonials = doctor.testimonials.length > 0
 
-/** Home-page sections, in page order. `id` is the anchor (e.g. /#about). */
-export const sections = [
-  { id: 'about', label: 'About' },
-  { id: 'expertise', label: 'Expertise' },
-  { id: 'approach', label: 'Approach' },
-  { id: 'experience', label: 'Experience' },
-  { id: 'credentials', label: 'Credentials' },
-  { id: 'research', label: 'Research' },
-  ...(showTestimonials ? [{ id: 'testimonials', label: 'Testimonials' }] : []),
-  { id: 'contact', label: 'Contact' },
-] as const satisfies readonly { id: string; label: string }[]
+export type NavRoute = {
+  path: string
+  label: string
+  /** Used in the document title. */
+  title: string
+  /** One line for the Home page index. */
+  blurb: string
+}
 
-export type SectionId = (typeof sections)[number]['id']
-
-/** Links in the primary navigation. */
-export const primaryNav: { id: SectionId; label: string }[] = [
-  { id: 'about', label: 'About' },
-  { id: 'expertise', label: 'Expertise' },
-  { id: 'experience', label: 'Experience' },
-  { id: 'research', label: 'Research' },
-  { id: 'contact', label: 'Contact' },
+/** Every page in the primary navigation, in order. Each is its own route. */
+export const navRoutes: NavRoute[] = [
+  { path: '/', label: 'Home', title: 'Home', blurb: '' },
+  { path: '/about', label: 'About', title: 'About', blurb: 'Background, philosophy and approach to care.' },
+  { path: '/expertise', label: 'Expertise', title: 'Expertise', blurb: 'Areas of clinical focus.' },
+  { path: '/experience', label: 'Experience', title: 'Experience', blurb: 'Clinical roles, training and verified credentials.' },
+  { path: '/research', label: 'Research', title: 'Research', blurb: 'Publications, studies and academic work.' },
+  { path: '/contact', label: 'Contact', title: 'Contact', blurb: 'Where to find the practice and how to get in touch.' },
 ]
 
 export const BOOK_PATH = '/consultation'
+export const BOOK_TITLE = 'Book a consultation'
+
+/** Old chapter URLs whose content now lives on another page. */
+export const legacyRedirects: Record<string, string> = {
+  '/credentials': '/experience',
+  '/approach': '/about',
+  '/testimonials': '/',
+}
+
+export const documentTitle = (pathname: string) => {
+  if (pathname === BOOK_PATH) return `${BOOK_TITLE} · ${doctor.name}`
+  const route = navRoutes.find((r) => r.path === pathname)
+  return !route || route.path === '/' ? doctor.name : `${route.title} · ${doctor.name}`
+}

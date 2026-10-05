@@ -1,28 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { doctor } from '../data/doctor'
-import { EASE } from './Reveal'
+import imageManifest from '../data/image-manifest.json'
+import { EASE, EASE_IN_OUT, ONCE, useDecorativeMotion } from '../lib/motion'
 
 type Props = {
   src: string
   alt: string
   className?: string
-  /** Eagerly load (above-the-fold imagery). */
+  /** Eagerly load and reveal on mount (above-the-fold imagery). */
   priority?: boolean
-  /** Scale the image on hover of the nearest `.group` ancestor. */
+  /** Scale the image slightly on hover of the nearest `.group` ancestor. */
   hoverZoom?: boolean
   /** Short caption shown on the placeholder, e.g. "Portrait". */
   placeholderLabel?: string
   imgClassName?: string
   delay?: number
+  /** Set false when a parent already animates the frame. */
+  reveal?: boolean
+  /** Rendered width hint for responsive images, e.g. "(min-width: 1024px) 40vw, 100vw". */
+  sizes?: string
 }
 
 type Status = 'loading' | 'loaded' | 'error'
 
+/** Written by `npm run images` (scripts/optimize-images.mjs). Empty until photos are supplied. */
+type ManifestEntry = { width: number; height: number; widths: number[]; formats: string[]; base: string }
+const manifest = imageManifest as Record<string, ManifestEntry>
+
+const MIME: Record<string, string> = { avif: 'image/avif', webp: 'image/webp' }
+
 /**
- * Image with a quiet, theme-aware placeholder. Real photographs can be dropped
- * into /public/images with the same filename — no code changes needed.
- * The placeholder is abstract by design: it never imitates a photograph.
+ * Image with a masked reveal: the frame opens upward while the picture settles
+ * from a slight scale. Real photographs can be dropped into /public/images with
+ * the same filename; until then a quiet, abstract placeholder is shown.
  */
 export default function MedicalImage({
   src,
@@ -33,9 +44,12 @@ export default function MedicalImage({
   placeholderLabel = 'Photograph',
   imgClassName = '',
   delay = 0,
+  reveal = true,
+  sizes = '100vw',
 }: Props) {
   const [status, setStatus] = useState<Status>('loading')
   const imgRef = useRef<HTMLImageElement>(null)
+  const animated = useDecorativeMotion() && reveal
 
   // Cached images can finish before React attaches handlers.
   useEffect(() => {
@@ -44,40 +58,62 @@ export default function MedicalImage({
   }, [src])
 
   const file = src.split('/').pop()
-  const reveal = { opacity: 1, scale: 1 }
+  const optimized = manifest[src]
+  const open = { clipPath: 'inset(0% 0% 0% 0%)' }
+  const settle = { scale: 1 }
+  const frameTrigger = priority ? { animate: open } : { whileInView: open, viewport: ONCE }
+  const imageTrigger = priority ? { animate: settle } : { whileInView: settle, viewport: ONCE }
 
   return (
-    <div className={`relative overflow-hidden bg-surface-2 ${className}`}>
+    <motion.div
+      className={`relative overflow-hidden bg-surface-2 ${className}`}
+      initial={animated ? { clipPath: 'inset(100% 0% 0% 0%)' } : false}
+      {...frameTrigger}
+      transition={{ duration: 1.1, ease: EASE_IN_OUT, delay }}
+    >
       <motion.div
         className="absolute inset-0"
-        initial={{ opacity: 0, scale: 1.04 }}
-        {...(priority ? { animate: reveal } : { whileInView: reveal, viewport: { once: true, margin: '0px 0px -8% 0px' } })}
-        transition={{ duration: 0.7, ease: EASE, delay }}
+        initial={animated ? { scale: 1.08 } : false}
+        {...imageTrigger}
+        transition={{ duration: 1.6, ease: EASE, delay }}
       >
         <div
-          className={`absolute inset-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            hoverZoom ? 'group-hover:scale-[1.03]' : ''
+          className={`absolute inset-0 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            hoverZoom ? 'group-hover:scale-[1.02]' : ''
           }`}
         >
           {status !== 'loaded' && <Placeholder label={placeholderLabel} file={file} alt={alt} />}
           {status !== 'error' && (
-            <img
-              ref={imgRef}
-              src={src}
-              alt={alt}
-              loading={priority ? 'eager' : 'lazy'}
-              decoding="async"
-              {...(priority ? { fetchPriority: 'high' as const } : {})}
-              onLoad={() => setStatus('loaded')}
-              onError={() => setStatus('error')}
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-                status === 'loaded' ? 'opacity-100' : 'opacity-0'
-              } ${imgClassName}`}
-            />
+            <picture>
+              {/* AVIF, then WebP, then the original, only for images the optimiser has processed */}
+              {optimized?.formats.map((format) => (
+                <source
+                  key={format}
+                  type={MIME[format]}
+                  sizes={sizes}
+                  srcSet={optimized.widths.map((w) => `${optimized.base}-${w}.${format} ${w}w`).join(', ')}
+                />
+              ))}
+              <img
+                ref={imgRef}
+                src={src}
+                alt={alt}
+                // Intrinsic size (when known) lets the browser reserve the aspect ratio before load.
+                {...(optimized ? { width: optimized.width, height: optimized.height } : {})}
+                loading={priority ? 'eager' : 'lazy'}
+                decoding="async"
+                {...(priority ? { fetchPriority: 'high' as const } : {})}
+                onLoad={() => setStatus('loaded')}
+                onError={() => setStatus('error')}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+                  status === 'loaded' ? 'opacity-100' : 'opacity-0'
+                } ${imgClassName}`}
+              />
+            </picture>
           )}
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -86,7 +122,7 @@ function Placeholder({ label, file, alt }: { label: string; file?: string; alt: 
     <div role="img" aria-label={`${alt} (image to be supplied)`} className="absolute inset-0 [container-type:size]">
       <span
         aria-hidden
-        className="em-serif absolute inset-0 flex items-center justify-center text-[min(28cqw,28cqh)] leading-none text-fg/15"
+        className="absolute inset-0 flex items-center justify-center font-serif text-[min(26cqw,26cqh)] leading-none text-fg/15"
       >
         {doctor.initials}
       </span>
