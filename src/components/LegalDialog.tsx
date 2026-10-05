@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'motion/react'
 
 export type LegalDoc = 'privacy' | 'terms'
 
@@ -44,21 +44,21 @@ export default function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; on
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          data-modal-open
+         
         >
-          <button type="button" aria-label="Close" className="absolute inset-0 bg-bg/70 backdrop-blur-sm" onClick={onClose} />
+          <button type="button" aria-label="Close" className="absolute inset-0 bg-fg/40" onClick={onClose} />
           <motion.div
             role="dialog"
             aria-modal="true"
             aria-labelledby="legal-title"
-            className="relative max-h-[85dvh] w-full max-w-xl overflow-y-auto rounded-3xl border border-line bg-surface p-7 shadow-[var(--shadow)] sm:p-10"
-            initial={{ y: 40, opacity: 0 }}
+            className="relative max-h-[85dvh] w-full max-w-xl overflow-y-auto rounded-lg border border-line bg-surface p-6 sm:p-10"
+            initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ y: 8, opacity: 0, transition: { duration: 0.18 } }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="flex items-start justify-between gap-6">
-              <h2 id="legal-title" className="display-md">
+              <h2 id="legal-title" className="heading-2">
                 {CONTENT[doc].title}
               </h2>
               <button
@@ -66,13 +66,13 @@ export default function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; on
                 type="button"
                 onClick={onClose}
                 aria-label="Close dialog"
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line-strong hover:border-fg"
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line-strong transition-colors duration-200 hover:border-fg"
               >
                 <span className="absolute h-px w-4 rotate-45 bg-current" />
                 <span className="absolute h-px w-4 -rotate-45 bg-current" />
               </button>
             </div>
-            <div className="mt-6 space-y-4 text-sm leading-relaxed text-muted">
+            <div className="mt-6 space-y-4 leading-relaxed text-muted">
               {CONTENT[doc].body.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}

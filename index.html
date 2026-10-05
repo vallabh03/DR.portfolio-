@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Dr. Abhinav Thaduri</title>
-    <meta name="description" content="Dr. Abhinav Thaduri — an immersive digital medical portfolio. Background, experience, credentials, areas of care, research and consultation requests." />
+    <meta name="description" content="Dr. Abhinav Thaduri — background, clinical experience, credentials, areas of care, research and consultation requests." />
     <meta name="author" content="Dr. Abhinav Thaduri" />
     <!-- TODO [VERIFY DOMAIN]: replace example.com with the real domain before launch -->
     <link rel="canonical" href="https://www.example.com/" />
@@ -12,25 +12,21 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Dr. Abhinav Thaduri" />
     <meta property="og:title" content="Dr. Abhinav Thaduri" />
-    <meta property="og:description" content="An immersive digital medical portfolio — experience, credentials, approach to care and consultation requests." />
+    <meta property="og:description" content="Experience, credentials, approach to care and consultation requests." />
     <meta property="og:url" content="https://www.example.com/" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Dr. Abhinav Thaduri" />
-    <meta name="twitter:description" content="An immersive digital medical portfolio." />
+    <meta name="twitter:description" content="Experience, credentials, approach to care and consultation requests." />
 
-    <meta name="theme-color" content="#0a1120" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#f5f4ef" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#f6f3ec" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <script>
-      // Apply the stored theme before first paint to avoid a flash.
+      // Light is the default; apply a stored choice before first paint to avoid a flash.
       (function () {
         try {
           var t = localStorage.getItem('at-theme')
-          if (t !== 'light' && t !== 'dark') {
-            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-          }
-          document.documentElement.setAttribute('data-theme', t)
+          document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light')
         } catch (e) {}
       })()
     </script>

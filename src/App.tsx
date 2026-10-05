@@ -1,55 +1,69 @@
-import { useCallback, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
-import { AppReadyContext, ChapterProvider, useChapters } from './context/ChapterContext'
-import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
-import { ChapterStage } from './components/PageTransition'
-import Navbar from './components/Navbar'
-import NavigationControls from './components/NavigationControls'
-import LoadingScreen from './components/LoadingScreen'
-import CustomCursor from './components/CustomCursor'
-import { pad } from './data/chapters'
+import { useEffect, useLayoutEffect } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigationType, useParams } from 'react-router'
+import SiteHeader from './components/SiteHeader'
+import Footer from './components/Footer'
+import MobileBookBar from './components/MobileBookBar'
+import HomePage from './pages/HomePage'
+import ConsultationPage from './pages/ConsultationPage'
+import { doctor } from './data/doctor'
+import { BOOK_PATH, sections } from './data/navigation'
 
-function Shell({ ready }: { ready: boolean }) {
-  useKeyboardNavigation(ready)
-  const { index, count, chapter } = useChapters()
+/**
+ * On every navigation: scroll to the #section if there is one (and move focus
+ * to it for keyboard and screen-reader users), otherwise start at the top.
+ */
+function ScrollManager() {
+  const { pathname, hash, key } = useLocation()
+  const navType = useNavigationType()
 
+  useLayoutEffect(() => {
+    const id = decodeURIComponent(hash.slice(1))
+    const target = id ? document.getElementById(id) : null
+    if (!target) {
+      // Back/forward without a #section: let the browser restore its position.
+      if (navType === 'POP') return
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      return
+    }
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    target.scrollIntoView({ behavior: reduce ? 'instant' : 'smooth', block: 'start' })
+    target.focus({ preventScroll: true })
+  }, [pathname, hash, key, navType])
+
+  useEffect(() => {
+    document.title = pathname === BOOK_PATH ? `Book a consultation — ${doctor.name}` : doctor.name
+  }, [pathname])
+
+  return null
+}
+
+/** Old chapter URLs (/about, /experience, …) land on their home-page section. */
+function LegacyRedirect() {
+  const { slug = '' } = useParams()
+  return <Navigate to={sections.some((s) => s.id === slug) ? `/#${slug}` : '/'} replace />
+}
+
+export default function App() {
   return (
     <>
       <a
         href="#main"
-        onClick={(e) => {
-          e.preventDefault()
-          document.getElementById('main')?.focus()
-        }}
-        className="fixed left-4 top-4 z-[120] -translate-y-24 rounded-full bg-fg px-5 py-3 text-sm text-bg transition-transform focus:translate-y-0"
+        className="fixed left-4 top-3 z-[120] -translate-y-24 rounded-md bg-fg px-5 py-3 text-sm font-medium text-bg transition-transform focus:translate-y-0"
       >
         Skip to content
       </a>
-      <div inert={!ready} aria-hidden={!ready}>
-        <ChapterStage />
-        <Navbar />
-        <NavigationControls />
-      </div>
-      <div className="grain" aria-hidden />
-      {/* Announce chapter changes for screen readers */}
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {ready ? `Chapter ${pad(index + 1)} of ${count}: ${chapter.title}` : ''}
-      </p>
+      <ScrollManager />
+      <SiteHeader />
+      <main id="main" tabIndex={-1} className="focus:outline-none">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path={BOOK_PATH} element={<ConsultationPage />} />
+          <Route path="/:slug" element={<LegacyRedirect />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+      <Footer />
+      <MobileBookBar />
     </>
-  )
-}
-
-export default function App() {
-  const [ready, setReady] = useState(false)
-  const onDone = useCallback(() => setReady(true), [])
-
-  return (
-    <AppReadyContext.Provider value={ready}>
-      <ChapterProvider>
-        <Shell ready={ready} />
-        <CustomCursor />
-        <AnimatePresence>{!ready && <LoadingScreen key="loader" onDone={onDone} />}</AnimatePresence>
-      </ChapterProvider>
-    </AppReadyContext.Provider>
   )
 }
