@@ -1,113 +1,208 @@
-import { useMemo, useRef, useState } from 'react'
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, LayoutGroup, motion, useScroll } from 'motion/react'
 import { doctor, isPlaceholder } from '../data/doctor'
-import { EASE, EASE_EXIT, EASE_IN_OUT, useEntrance } from '../lib/motion'
-import { useScrollTrack } from '../hooks/useScrollTrack'
+import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import MedicalImage from '../components/MedicalImage'
+import DrawLine from '../components/DrawLine'
+import { ArrowUpRight } from '../components/Button'
 import BookingPrompt from '../components/BookingPrompt'
 
+const pad = (n: number) => String(n).padStart(2, '0')
+const entryId = (i: number) => `record-${i + 1}`
+
+/**
+ * Experience: a formal professional record. The dates drive the composition:
+ * a chronology whose sticky year rolls to the entry being read, followed by a
+ * typographic register of verified credentials.
+ */
 export default function Experience() {
-  const entrance = useEntrance()
   return (
     <>
-      {/* ── Hero ── */}
-      <section aria-labelledby="experience-title" className="container-page pb-12 pt-10 md:pb-16 md:pt-16 lg:pt-24">
-        <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
-          <div className="lg:col-span-7">
-            <RevealText as="h1" id="experience-title" lines={['Track record']} className="display-hero" delay={0.1} immediate />
-          </div>
-          <motion.p
-            className="lead measure lg:col-span-5 lg:self-end"
-            {...entrance(0.4)}
-          >
-            A timeline of clinical roles and training, followed by verified qualifications, certifications and memberships.
-          </motion.p>
-        </div>
-      </section>
-
-      <Timeline />
+      <Opening />
+      <Chronology />
       <Credentials />
       <BookingPrompt />
     </>
   )
 }
 
-/** Career timeline: the line fills with scroll and each point fills as it is passed. */
-function Timeline() {
-  const items = doctor.experience
-  const listRef = useRef<HTMLOListElement>(null)
-  const { progress, reached } = useScrollTrack(listRef, items.length)
+/* ── 1. Opening ──────────────────────────────────────────────────────────── */
 
+function Opening() {
+  const entrance = useEntrance()
   return (
-    <section aria-labelledby="timeline-title" className="container-page pb-16 md:pb-24 lg:pb-32">
-      <h2 id="timeline-title" className="sr-only">
-        Clinical roles and training
-      </h2>
-      <ol ref={listRef} className="relative">
-        {/* Track and progress, aligned to the node column */}
-        <span aria-hidden className="absolute bottom-2 left-[0.4375rem] top-2 w-px bg-line md:left-[calc(25%+0.4375rem)]" />
-        <motion.span
-          aria-hidden
-          className="absolute bottom-2 left-[0.4375rem] top-2 w-px origin-top bg-accent md:left-[calc(25%+0.4375rem)]"
-          style={{ scaleY: progress }}
-        />
-
-        {items.map((item, i) => {
-          const passed = i < reached
-          return (
-            <li key={i} className="relative grid grid-cols-[1rem_1fr] gap-x-6 pb-12 last:pb-0 md:grid-cols-[25%_1rem_1fr] md:gap-x-0 md:pb-16">
-              {/* Year (desktop column) */}
-              <p
-                className={`hidden pr-10 text-right font-serif text-[clamp(1.5rem,1.2rem+1vw,2.25rem)] leading-none tabular-nums transition-colors duration-500 md:block ${
-                  passed ? 'text-brass' : 'text-muted'
-                }`}
-              >
-                {item.year}
-              </p>
-              {/* Node */}
-              <span aria-hidden className="relative flex justify-center pt-1.5">
-                <span
-                  className={`relative z-10 block h-[15px] w-[15px] rounded-full border transition-colors duration-500 ${
-                    passed ? 'border-accent bg-accent' : 'border-line-strong bg-bg'
-                  }`}
-                />
-              </span>
-              {/* Entry */}
-              <div className="min-w-0 md:pl-10">
-                <p className="font-serif text-lg tabular-nums text-brass md:hidden">{item.year}</p>
-                <h3 className={`heading-3 !text-[clamp(1.5rem,1.3rem+0.8vw,2rem)] ${isPlaceholder(item.role) ? 'text-fg/75' : ''}`}>{item.role}</h3>
-                <p className="mt-1 text-muted">
-                  {item.institution}
-                  {item.location ? `, ${item.location}` : ''}
-                </p>
-                <p className={`measure mt-4 ${isPlaceholder(item.description) ? 'text-muted' : 'text-fg/85'}`}>{item.description}</p>
-                {item.highlights && item.highlights.length > 0 && (
-                  <ul className="mt-4 space-y-1.5">
-                    {item.highlights.map((h, j) => (
-                      <li key={j} className="flex gap-3 text-muted">
-                        <span aria-hidden className="mt-[0.8em] h-px w-3 shrink-0 bg-brass" />
-                        {h}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-      <p className="mt-10 text-sm text-muted md:pl-[calc(25%+3.5rem)]">Dates, positions and institutions will be added once verified.</p>
+    <section aria-labelledby="experience-title" className="container-page pt-10 md:pt-16 lg:pt-24">
+      <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
+        <div className="lg:col-span-7">
+          <RevealText as="h1" id="experience-title" lines={['Track record']} className="display-hero" delay={0.1} immediate />
+        </div>
+        <motion.p className="lead measure lg:col-span-5 lg:self-end lg:pb-3" {...entrance(0.4)}>
+          A timeline of clinical roles and training, followed by verified qualifications, certifications and memberships.
+        </motion.p>
+      </div>
+      <DrawLine immediate delay={0.5} duration={1.2} className="mt-12 bg-line-strong md:mt-16" />
     </section>
   )
 }
 
-/** Verified credentials with category filters; cards rearrange smoothly. */
+/* ── 2. Chronology ───────────────────────────────────────────────────────── */
+
+/** Index of the entry crossing the reading line, plus the direction of travel. */
+function useActiveEntry(count: number) {
+  const [state, setState] = useState({ active: 0, direction: 1 })
+  useEffect(() => {
+    const els = Array.from({ length: count }, (_, i) => document.getElementById(entryId(i))).filter((el): el is HTMLElement => !!el)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue
+          const next = els.indexOf(e.target as HTMLElement)
+          setState((s) => (s.active === next ? s : { active: next, direction: next > s.active ? 1 : -1 }))
+        }
+      },
+      { rootMargin: '-45% 0px -50% 0px' },
+    )
+    els.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [count])
+  return state
+}
+
+function Chronology() {
+  const items = doctor.experience
+  const listRef = useRef<HTMLOListElement>(null)
+  const { active, direction } = useActiveEntry(items.length)
+  const animated = useDecorativeMotion()
+  // The line fills as the reading line moves through the record.
+  const { scrollYProgress } = useScroll({ target: listRef, offset: ['start 50%', 'end 50%'] })
+
+  return (
+    <section aria-labelledby="chronology-title" className="container-page pb-12 pt-12 md:pb-16 md:pt-16 lg:pt-20">
+      <h2 id="chronology-title" className="sr-only">
+        Clinical roles and training
+      </h2>
+      <div className="grid gap-10 lg:grid-cols-12">
+        {/* Sticky year (desktop only; each entry also carries its own year for all readers) */}
+        <div aria-hidden className="hidden lg:col-span-4 lg:block">
+          <StickyYear year={items[active].year} index={active} count={items.length} direction={direction} />
+        </div>
+
+        <div className="lg:col-span-8">
+          <ol ref={listRef} className="relative">
+            {/* Track and progress, through the centre of the markers. Under reduced motion the
+              line is shown complete and the markers alone carry the reader's position. */}
+            <span aria-hidden className="absolute bottom-2 left-[0.5625rem] top-2 w-px bg-line" />
+            <motion.span aria-hidden className="absolute bottom-2 left-[0.5625rem] top-2 w-px origin-top bg-accent" style={{ scaleY: animated ? scrollYProgress : 1 }} />
+
+            {items.map((item, i) => (
+              <Entry key={i} index={i} state={i < active ? 'passed' : i === active ? 'current' : 'upcoming'} {...item} />
+            ))}
+          </ol>
+          <p className="mt-10 pl-[calc(1.25rem+1.5rem)] text-sm text-muted sm:pl-[calc(1.25rem+2.5rem)]">
+            Dates, positions and institutions will be added once verified.
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** The year of the entry being read, set as display type. Rolls with the direction of travel. */
+function StickyYear({ year, index, count, direction }: { year: string; index: number; count: number; direction: number }) {
+  const animated = useDecorativeMotion()
+  const roll = {
+    enter: (d: number) => (animated ? { y: d > 0 ? '100%' : '-100%' } : { y: '0%' }),
+    center: { y: '0%', transition: { duration: animated ? 0.55 : 0, ease: EASE } },
+    exit: (d: number) => (animated ? { y: d > 0 ? '-100%' : '100%', transition: { duration: 0.3, ease: EASE_EXIT } } : { opacity: 0, transition: { duration: 0 } }),
+  }
+
+  return (
+    <div className="sticky top-32">
+      <div className="relative h-[1.1em] overflow-hidden font-serif text-[clamp(3.5rem,2rem+3.4vw,6rem)] leading-[1.1] tracking-[-0.02em] text-brass">
+        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+          <motion.span key={index} className="block whitespace-nowrap" custom={direction} variants={roll} initial="enter" animate="center" exit="exit">
+            {year}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+      <p className="mt-4 flex items-baseline gap-2 text-sm text-muted">
+        Entry
+        <span className="relative inline-block h-[1.4em] overflow-hidden font-serif text-base tabular-nums text-fg">
+          <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+            <motion.span key={index} className="block leading-[1.4]" custom={direction} variants={roll} initial="enter" animate="center" exit="exit">
+              {pad(index + 1)}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+        / {pad(count)}
+      </p>
+    </div>
+  )
+}
+
+type EntryState = 'passed' | 'current' | 'upcoming'
+
+/** Marker shapes differ by state as well as colour: filled, ringed, or open. */
+function Marker({ state }: { state: EntryState }) {
+  return (
+    <span aria-hidden className="relative z-10 mt-2 flex h-[19px] w-[19px] items-center justify-center rounded-full bg-bg">
+      <span
+        className={`flex h-[11px] w-[11px] items-center justify-center rounded-full border transition-colors duration-500 ${
+          state === 'passed' ? 'border-accent bg-accent' : state === 'current' ? 'border-accent bg-bg' : 'border-line-strong bg-bg'
+        }`}
+      />
+      {/* Restrained ring around the current entry */}
+      <span
+        className={`absolute inset-0 rounded-full border border-accent transition-[opacity,transform] duration-500 ${
+          state === 'current' ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+        }`}
+      />
+    </span>
+  )
+}
+
+function Entry({ index, state, year, role, institution, location, description, highlights }: { index: number; state: EntryState } & (typeof doctor.experience)[number]) {
+  return (
+    <li id={entryId(index)} className="relative grid grid-cols-[1.25rem_1fr] gap-x-6 pb-14 last:pb-0 sm:gap-x-10 md:pb-20 lg:min-h-[55vh]">
+      <Marker state={state} />
+      <article aria-labelledby={`${entryId(index)}-title`} className="min-w-0">
+        {/* Year: inline below desktop; on desktop it is carried by the sticky indicator and kept for screen readers */}
+        <p className="font-serif text-[clamp(2rem,1.6rem+1.6vw,2.5rem)] leading-none tabular-nums text-brass lg:sr-only">{year}</p>
+        <h3
+          id={`${entryId(index)}-title`}
+          className={`mt-3 font-serif text-[clamp(1.75rem,1.45rem+1.2vw,2.5rem)] leading-[1.1] tracking-[-0.015em] lg:mt-0 ${isPlaceholder(role) ? 'text-fg/75' : ''}`}
+        >
+          {role}
+        </h3>
+        <p className="mt-2 text-muted">
+          {institution}
+          {location ? `, ${location}` : ''}
+        </p>
+        <p className={`measure mt-5 text-lg leading-[1.7] ${isPlaceholder(description) ? 'text-muted' : 'text-fg/90'}`}>{description}</p>
+        {highlights && highlights.length > 0 && (
+          <ul className="measure mt-6 border-t border-line">
+            {highlights.map((h, j) => (
+              <li key={j} className={`flex gap-3 border-b border-line py-3 ${isPlaceholder(h) ? 'text-muted' : ''}`}>
+                <span aria-hidden className="mt-[0.8em] h-px w-3 shrink-0 bg-brass" />
+                {h}
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+    </li>
+  )
+}
+
+/* ── 3. Verified credentials: a typographic register ─────────────────────── */
+
 function Credentials() {
+  const animated = useDecorativeMotion()
   const [filter, setFilter] = useState<string>('All')
   const groups = doctor.credentials
 
-  // Number every credential once, so numbers stay stable while filtering.
+  // Number every credential once, so identity stays stable while filtering.
   const all = useMemo(
     () => groups.flatMap((g) => g.items.map((item) => ({ ...item, category: g.category }))).map((c, i) => ({ ...c, n: i + 1 })),
     [groups],
@@ -119,7 +214,8 @@ function Credentials() {
     <section aria-labelledby="credentials-title" className="border-y border-line bg-surface">
       <div className="container-page section-y">
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
-          <div className="lg:col-span-4 lg:sticky lg:top-32 lg:self-start">
+          {/* Heading, introduction and the credential image */}
+          <div className="lg:col-span-4">
             <RevealText as="h2" id="credentials-title" lines={['Verified credentials']} className="heading-2" />
             <p className="lead measure mt-6">
               Qualifications, specialised training, certifications and professional memberships. Each entry is published only
@@ -127,17 +223,18 @@ function Credentials() {
             </p>
             <MedicalImage
               src="/images/credential-01.jpg"
-              sizes="30vw"
+              sizes="(min-width: 1024px) 30vw, 100vw"
               alt="Credential document"
               placeholderLabel="Credential"
-              className="mt-10 hidden aspect-[16/10] w-full rounded-lg lg:block"
               hoverZoom={false}
+              className="mt-10 hidden aspect-[4/5] w-full max-w-sm rounded-lg lg:block"
             />
           </div>
 
+          {/* Filters and register */}
           <div className="min-w-0 lg:col-span-8">
             <LayoutGroup>
-              <div role="group" aria-label="Filter credentials by category" className="flex flex-wrap gap-2">
+              <div role="group" aria-label="Filter credentials by category" className="flex flex-wrap gap-x-6 border-b border-line">
                 {filters.map((f) => {
                   const on = f === filter
                   return (
@@ -146,53 +243,69 @@ function Credentials() {
                       type="button"
                       aria-pressed={on}
                       onClick={() => setFilter(f)}
-                      className={`relative min-h-11 rounded-md border px-4 text-sm font-medium transition-colors duration-300 ${
-                        on ? 'border-fg text-bg' : 'border-line-strong text-muted hover:border-fg hover:text-fg'
-                      }`}
+                      className={`relative min-h-11 py-3 text-sm transition-colors duration-200 ${on ? 'font-medium text-fg' : 'text-muted hover:text-fg'}`}
                     >
+                      {f}
                       {on && (
                         <motion.span
-                          layoutId="credential-filter"
-                          className="absolute -inset-px -z-0 rounded-md bg-fg"
-                          transition={{ duration: 0.4, ease: EASE_IN_OUT }}
+                          layoutId="credential-filter-indicator"
+                          aria-hidden
+                          className="absolute inset-x-0 -bottom-px h-px bg-accent"
+                          transition={{ duration: animated ? 0.4 : 0, ease: EASE_IN_OUT }}
                         />
                       )}
-                      <span className="relative">{f}</span>
                     </button>
                   )
                 })}
               </div>
 
-              <motion.ul layout className="mt-8 grid gap-4 sm:grid-cols-2" aria-live="polite">
+              <p className="sr-only" aria-live="polite">
+                Showing {filter === 'All' ? 'all categories' : filter}
+              </p>
+
+              <ul className="mt-2">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {visible.map((c) => (
                     <motion.li
                       key={c.n}
-                      layout
-                      initial={{ opacity: 0, y: 12 }}
+                      layout={animated ? 'position' : false}
+                      initial={animated ? { opacity: 0, y: 8 } : false}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE_EXIT } }}
-                      transition={{ duration: 0.45, ease: EASE }}
-                      className="group flex flex-col rounded-lg border border-line bg-bg p-6 transition-[border-color,transform] duration-300 hover:-translate-y-0.5 hover:border-accent sm:p-8"
+                      exit={{ opacity: 0, transition: { duration: animated ? 0.15 : 0, ease: EASE_EXIT } }}
+                      transition={{ duration: 0.4, ease: EASE }}
+                      className="group grid gap-x-8 gap-y-2 border-b border-line py-6 sm:grid-cols-[5rem_1fr] lg:grid-cols-[5rem_1fr_13rem]"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <span className="text-sm text-muted">{c.category}</span>
-                        <span aria-hidden className="font-serif tabular-nums text-brass">
-                          {String(c.n).padStart(2, '0')}
-                        </span>
+                      <span className="font-serif text-lg tabular-nums text-brass">{c.year}</span>
+                      <div className="min-w-0">
+                        <h3
+                          className={`font-serif text-[1.375rem] leading-snug transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 ${
+                            isPlaceholder(c.title) ? 'text-fg/75' : ''
+                          }`}
+                        >
+                          {c.title}
+                        </h3>
+                        <p className={`mt-1 text-sm leading-relaxed ${isPlaceholder(c.description) ? 'text-muted' : 'text-fg/80'}`}>{c.description}</p>
+                        <p className="mt-2 text-xs text-muted">{c.category}</p>
+                        {c.link && (
+                          <a
+                            href={c.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+                          >
+                            <span className="link-underline">View source</span>
+                            <ArrowUpRight />
+                            <span className="sr-only">(opens in a new tab)</span>
+                          </a>
+                        )}
                       </div>
-                      <h3 className={`heading-3 mt-8 ${isPlaceholder(c.title) ? 'text-fg/75' : ''}`}>{c.title}</h3>
-                      <span aria-hidden className="mt-4 block h-px w-8 bg-brass transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-14" />
-                      <p className="mt-4 flex flex-wrap gap-x-2 text-muted">
-                        <span>{c.institution}</span>
-                        <span aria-hidden>·</span>
-                        <span className="tabular-nums">{c.year}</span>
+                      <p className={`text-sm sm:col-start-2 lg:col-start-auto lg:text-right ${isPlaceholder(c.institution) ? 'text-muted' : 'text-fg/85'}`}>
+                        {c.institution}
                       </p>
-                      <p className="mt-3 text-sm leading-relaxed text-muted">{c.description}</p>
                     </motion.li>
                   ))}
                 </AnimatePresence>
-              </motion.ul>
+              </ul>
             </LayoutGroup>
           </div>
         </div>
