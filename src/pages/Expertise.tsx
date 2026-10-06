@@ -1,181 +1,307 @@
-import { useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { Link } from 'react-router'
 import { doctor, isPlaceholder } from '../data/doctor'
+import { BOOK_PATH } from '../data/navigation'
 import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import MedicalImage from '../components/MedicalImage'
 import DrawLine from '../components/DrawLine'
+import { ArrowRight } from '../components/Button'
 import BookingPrompt from '../components/BookingPrompt'
 
+const pad = (n: number) => String(n).padStart(2, '0')
+const areaId = (i: number) => `area-${i + 1}`
+
+/**
+ * Expertise: a clinical atlas. One entry per area of focus, each with its
+ * conditions and procedures always visible. On desktop a sticky image plate
+ * follows the entry being read: the plate wipes upward to the next image, its
+ * number rolls, and a four-part indicator shows position in the sequence.
+ */
 export default function Expertise() {
-  const entrance = useEntrance()
   const items = doctor.expertise
-  const [open, setOpen] = useState<number | null>(null)
-  const [preview, setPreview] = useState(0)
-  const shown = open ?? preview
-  const animated = useDecorativeMotion()
+  const active = useActiveArea(items.length)
 
   return (
     <>
-      {/* ── Hero: oversized headline with the introduction set against it ── */}
-      <section aria-labelledby="expertise-title" className="container-page pb-12 pt-10 md:pb-20 md:pt-16 lg:pt-24">
-        <div className="grid gap-8 lg:grid-cols-12 lg:items-end lg:gap-10">
-          <RevealText as="h1" id="expertise-title" lines={['Areas of', 'clinical focus']} className="display-hero lg:col-span-8" delay={0.1} immediate />
-          <motion.p
-            className="lead measure lg:col-span-4 lg:pb-3"
-            {...entrance(0.45)}
-          >
-            Only verified specialties are listed here. Select an area to see the conditions and procedures it covers.
-          </motion.p>
-        </div>
-        <DrawLine immediate delay={0.5} duration={1.3} className="mt-12 bg-line-strong md:mt-16" />
-      </section>
-
-      {/* ── Index + sticky image panel ── */}
-      <section aria-label="Areas of care" className="container-page pb-16 md:pb-24 lg:pb-32">
-        <div className="grid gap-10 lg:grid-cols-12">
-          <ol className="lg:col-span-7">
-            {items.map((item, i) => {
-              const isOpen = open === i
-              const n = String(i + 1).padStart(2, '0')
-              const panelId = `expertise-panel-${i}`
-              return (
-                <li
-                  key={i}
-                  className="relative"
-                  onMouseEnter={() => setPreview(i)}
-                  onFocus={() => setPreview(i)}
-                >
-                  {i > 0 && <DrawLine className="absolute inset-x-0 top-0 bg-line" delay={0.05 * i} />}
-                  <h2>
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      aria-controls={panelId}
-                      onClick={() => setOpen(isOpen ? null : i)}
-                      className="group grid w-full grid-cols-[2.5rem_1fr_auto] items-start gap-4 pt-7 text-left sm:grid-cols-[3.5rem_1fr_auto] md:pt-9"
-                    >
-                      <span
-                        aria-hidden
-                        className={`pt-1 font-serif text-lg tabular-nums transition-colors duration-300 sm:text-xl ${isOpen ? 'text-accent' : 'text-brass'}`}
-                      >
-                        {n}
-                      </span>
-                      <span
-                        className={`min-w-0 pt-0.5 font-serif text-[clamp(1.625rem,1.35rem+1.2vw,2.5rem)] leading-[1.1] tracking-[-0.015em] transition-[transform,color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1.5 group-hover:text-accent ${
-                          isPlaceholder(item.title) ? 'text-fg/75' : ''
-                        }`}
-                      >
-                        {item.title}
-                      </span>
-                      <span
-                        aria-hidden
-                        className={`relative mt-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-300 ${
-                          isOpen ? 'border-accent bg-accent text-on-accent' : 'border-line-strong group-hover:border-accent group-hover:text-accent'
-                        }`}
-                      >
-                        <span className="absolute h-px w-3.5 bg-current" />
-                        <motion.span
-                          className="absolute h-3.5 w-px bg-current"
-                          animate={{ rotate: isOpen ? 90 : 0, opacity: isOpen ? 0 : 1 }}
-                          transition={{ duration: 0.35, ease: EASE_IN_OUT }}
-                        />
-                      </span>
-                    </button>
-                  </h2>
-                  <p
-                    className={`measure pb-7 pl-[3.5rem] pr-14 pt-2 sm:pl-[4.5rem] md:pb-9 ${isPlaceholder(item.description) ? 'text-muted' : 'text-fg/85'}`}
-                  >
-                    {item.description}
-                  </p>
-
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.div
-                        id={panelId}
-                        role="region"
-                        aria-label={`${item.title}: conditions and procedures`}
-                        className="overflow-hidden"
-                        initial={{ height: 0 }}
-                        animate={{ height: 'auto' }}
-                        exit={{ height: 0, transition: { duration: 0.3, ease: EASE_EXIT } }}
-                        transition={{ duration: 0.5, ease: EASE_IN_OUT }}
-                      >
-                        <div className="pb-8 pl-[3.5rem] sm:pl-[4.5rem]">
-                          <h3 className="label">Conditions and procedures</h3>
-                          <ul className="mt-3 border-t border-line">
-                            {item.details.map((d, j) => (
-                              <motion.li
-                                key={j}
-                                className={`border-b border-line py-3 ${isPlaceholder(d) ? 'text-muted' : ''}`}
-                                initial={{ opacity: 0, x: -8 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.4, ease: EASE, delay: 0.15 + j * 0.05 }}
-                              >
-                                {d}
-                              </motion.li>
-                            ))}
-                          </ul>
-                          {/* On smaller screens the image sits inside the open panel */}
-                          <MedicalImage
-                            src={item.image}
-                            sizes="100vw"
-                            alt={`${item.title}, illustrative image`}
-                            placeholderLabel={`Expertise ${n}`}
-                            className="mt-6 aspect-[4/3] w-full rounded-lg lg:hidden"
-                            hoverZoom={false}
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </li>
-              )
-            })}
-            <li aria-hidden className="relative">
-              <DrawLine className="absolute inset-x-0 top-0 bg-line" delay={0.05 * items.length} />
-            </li>
-          </ol>
-
-          {/* Desktop: the selected or hovered area's image, changed with a mask wipe */}
-          <div className="hidden lg:col-span-5 lg:block">
-            <div className="sticky top-28">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-surface-2">
-                <AnimatePresence initial={false} mode="popLayout">
-                  <motion.div
-                    key={shown}
-                    className="absolute inset-0"
-                    initial={animated ? { clipPath: 'inset(0% 0% 0% 100%)', zIndex: 1 } : false}
-                    animate={{ clipPath: 'inset(0% 0% 0% 0%)', zIndex: 1 }}
-                    // The previous image stays beneath until the new one has covered it.
-                    exit={{ zIndex: 0, transition: { duration: 0, delay: 0.7 } }}
-                    transition={{ duration: 0.7, ease: EASE_IN_OUT }}
-                  >
-                    <MedicalImage
-                      src={items[shown].image}
-                      sizes="38vw"
-                      alt={`${items[shown].title}, illustrative image`}
-                      placeholderLabel={`Expertise ${String(shown + 1).padStart(2, '0')}`}
-                      className="h-full w-full"
-                      priority
-                      reveal={false}
-                      hoverZoom={false}
-                    />
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-              <p className="mt-4 flex items-baseline justify-between gap-4 text-sm text-muted" aria-hidden>
-                <span className={isPlaceholder(items[shown].title) ? '' : 'text-fg'}>{items[shown].title}</span>
-                <span className="tabular-nums">
-                  {String(shown + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      <Opening active={active} />
+      <Atlas active={active} />
+      <ClosingNote />
       <BookingPrompt />
     </>
+  )
+}
+
+/** Index of the entry crossing the reading line; holds the last one between entries. */
+function useActiveArea(count: number) {
+  const [active, setActive] = useState(0)
+  useEffect(() => {
+    const els = Array.from({ length: count }, (_, i) => document.getElementById(areaId(i))).filter((el): el is HTMLElement => !!el)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) setActive(els.indexOf(e.target as HTMLElement))
+      },
+      { rootMargin: '-45% 0px -50% 0px' },
+    )
+    els.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [count])
+  return active
+}
+
+function useJumpTo() {
+  const reduce = useReducedMotion()
+  return (i: number) => {
+    const el = document.getElementById(areaId(i))
+    if (!el) return
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 112, behavior: reduce ? 'instant' : 'smooth' })
+    el.focus({ preventScroll: true })
+  }
+}
+
+/* ── 1. Opening: headline, introduction and a table of contents ──────────── */
+
+function Opening({ active }: { active: number }) {
+  const entrance = useEntrance()
+  const jumpTo = useJumpTo()
+  const items = doctor.expertise
+
+  return (
+    <section aria-labelledby="expertise-title" className="container-page pb-12 pt-10 md:pb-16 md:pt-16 lg:pt-24">
+      <div className="grid gap-8 lg:grid-cols-12 lg:items-end lg:gap-10">
+        <RevealText as="h1" id="expertise-title" lines={['Areas of', 'clinical focus']} className="display-hero lg:col-span-8" delay={0.1} immediate />
+        <motion.p className="lead measure lg:col-span-4 lg:pb-3" {...entrance(0.45)}>
+          Each area of clinical focus, with the conditions and procedures it covers.
+        </motion.p>
+      </div>
+
+      {/* Table of contents: the four areas as one set */}
+      <nav aria-label="Areas of care" className="relative mt-12 md:mt-16">
+        <DrawLine immediate delay={0.5} duration={1.2} className="absolute inset-x-0 top-0 bg-line-strong" />
+        <ol className="grid lg:grid-cols-4 lg:gap-6">
+          {items.map((item, i) => (
+            <li key={i} className="relative border-b border-line lg:border-b-0">
+              <button
+                type="button"
+                onClick={() => jumpTo(i)}
+                aria-current={active === i ? 'true' : undefined}
+                className="group flex min-h-11 w-full items-baseline gap-3 py-3 text-left lg:pb-5 lg:pt-4"
+              >
+                <span aria-hidden className="font-serif tabular-nums text-brass">
+                  {pad(i + 1)}
+                </span>
+                <span
+                  className={`transition-[transform,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-fg ${
+                    active === i ? 'text-fg' : 'text-muted'
+                  }`}
+                >
+                  {item.title}
+                </span>
+              </button>
+              {/* The active marker slides between entries (desktop) */}
+              {active === i && (
+                <motion.span
+                  layoutId="atlas-toc-marker"
+                  aria-hidden
+                  className="absolute bottom-0 left-0 hidden h-px w-10 bg-accent lg:block"
+                  transition={{ duration: 0.45, ease: EASE_IN_OUT }}
+                />
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </section>
+  )
+}
+
+/* ── 2. The atlas: sticky plate (desktop) beside the entries ─────────────── */
+
+function Atlas({ active }: { active: number }) {
+  const items = doctor.expertise
+
+  return (
+    <section aria-label="Areas of care in detail" className="border-t border-line">
+      <div className="container-page pb-16 pt-12 md:pb-24 md:pt-16 lg:pb-32">
+        <div className="grid gap-10 lg:grid-cols-12">
+          <div className="hidden lg:col-span-5 lg:block">
+            <Plate active={active} />
+          </div>
+          <div className="lg:col-span-7">
+            {items.map((item, i) => (
+              <Entry key={i} index={i} isActive={active === i} title={item.title} description={item.description} details={item.details} image={item.image} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** The sticky image plate: wipes upward between images, with a rolling number and progress. */
+function Plate({ active }: { active: number }) {
+  const items = doctor.expertise
+  const animated = useDecorativeMotion()
+  const item = items[active]
+
+  return (
+    <figure className="sticky top-28">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-surface-2">
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={active}
+            className="absolute inset-0"
+            initial={animated ? { clipPath: 'inset(100% 0% 0% 0%)', zIndex: 1 } : false}
+            animate={{ clipPath: 'inset(0% 0% 0% 0%)', zIndex: 1 }}
+            // The previous plate stays beneath until the new one has covered it.
+            exit={{ zIndex: 0, transition: { duration: 0, delay: animated ? 0.8 : 0 } }}
+            transition={{ duration: 0.8, ease: EASE_IN_OUT }}
+          >
+            <motion.div
+              className="absolute inset-0"
+              initial={animated ? { scale: 1.04 } : false}
+              animate={{ scale: 1 }}
+              transition={{ duration: 1.2, ease: EASE }}
+            >
+              <MedicalImage
+                src={item.image}
+                sizes="(min-width: 1360px) 520px, 38vw"
+                alt={`${item.title}, illustrative image`}
+                placeholderLabel={`Expertise ${pad(active + 1)}`}
+                priority
+                reveal={false}
+                hoverZoom={false}
+                className="h-full w-full"
+              />
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Caption: plate number, title and position in the sequence (visual; the entries carry the text) */}
+      <figcaption aria-hidden className="mt-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="flex items-baseline gap-2 text-sm text-muted">
+            Plate
+            <span className="relative inline-block h-[1.4em] overflow-hidden font-serif text-base tabular-nums text-brass">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={active}
+                  className="block leading-[1.4]"
+                  initial={animated ? { y: '100%' } : false}
+                  animate={{ y: '0%' }}
+                  exit={animated ? { y: '-100%', transition: { duration: 0.25, ease: EASE_EXIT } } : { opacity: 0, transition: { duration: 0 } }}
+                  transition={{ duration: 0.45, ease: EASE }}
+                >
+                  {pad(active + 1)}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+            / {pad(items.length)}
+          </span>
+          <span className={`truncate text-right text-sm ${isPlaceholder(item.title) ? 'text-muted' : 'text-fg'}`}>{item.title}</span>
+        </div>
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {items.map((_, i) => (
+            <span
+              key={i}
+              className={`h-px transition-colors duration-500 ${i === active ? 'bg-accent' : i < active ? 'bg-fg/40' : 'bg-line-strong'}`}
+            />
+          ))}
+        </div>
+      </figcaption>
+    </figure>
+  )
+}
+
+/** One atlas entry: number, title, brass rule, description, and its conditions and procedures. */
+function Entry({
+  index,
+  isActive,
+  title,
+  description,
+  details,
+  image,
+}: {
+  index: number
+  isActive: boolean
+  title: string
+  description: string
+  details: string[]
+  image: string
+}) {
+  const animated = useDecorativeMotion()
+  const n = pad(index + 1)
+
+  return (
+    <article
+      id={areaId(index)}
+      tabIndex={-1}
+      aria-labelledby={`${areaId(index)}-title`}
+      className="relative py-12 focus:outline-none md:py-16 lg:flex lg:min-h-[70vh] lg:flex-col lg:justify-center"
+    >
+      {index > 0 && <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />}
+
+      {/* Phones and tablets: the image sits in the entry, opening once as it arrives */}
+      <MedicalImage
+        src={image}
+        sizes="(min-width: 768px) 90vw, 100vw"
+        alt={`${title}, illustrative image`}
+        placeholderLabel={`Expertise ${n}`}
+        hoverZoom={false}
+        className="mb-8 aspect-[4/3] w-full rounded-lg lg:hidden"
+      />
+
+      <div className="flex items-baseline gap-4">
+        <span aria-hidden className="font-serif text-xl tabular-nums text-brass">
+          {n}
+        </span>
+        {/* Teal marker: ties the entry being read to the plate (desktop) */}
+        <motion.span
+          aria-hidden
+          className="hidden h-px w-8 origin-left self-center bg-accent lg:block"
+          initial={false}
+          animate={{ scaleX: isActive ? 1 : 0 }}
+          transition={{ duration: animated ? 0.5 : 0, ease: EASE_IN_OUT }}
+        />
+      </div>
+
+      <h2
+        id={`${areaId(index)}-title`}
+        className={`mt-4 font-serif text-[clamp(2.25rem,1.7rem+2.4vw,3.5rem)] leading-[1.05] tracking-[-0.02em] ${
+          isPlaceholder(title) ? 'text-fg/75' : ''
+        }`}
+      >
+        {title}
+      </h2>
+      <DrawLine className="mt-6 w-16 bg-brass" duration={0.7} />
+      <p className={`measure mt-6 text-lg leading-[1.7] ${isPlaceholder(description) ? 'text-muted' : 'text-fg/90'}`}>{description}</p>
+
+      <h3 className="label mt-10">Conditions and procedures</h3>
+      <ul className="measure mt-3 border-t border-line">
+        {details.map((d, j) => (
+          <li key={j} className={`border-b border-line py-3 ${isPlaceholder(d) ? 'text-muted' : ''}`}>
+            {d}
+          </li>
+        ))}
+      </ul>
+    </article>
+  )
+}
+
+/* ── 3. Closing note ─────────────────────────────────────────────────────── */
+
+function ClosingNote() {
+  return (
+    <section aria-label="About these listings" className="container-page pb-16 md:pb-24">
+      <div className="flex flex-col gap-4 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-muted">Only verified specialties are listed here.</p>
+        <Link to={BOOK_PATH} className="group/btn inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
+          <span className="link-underline">Book a consultation</span>
+          <ArrowRight />
+        </Link>
+      </div>
+    </section>
   )
 }
