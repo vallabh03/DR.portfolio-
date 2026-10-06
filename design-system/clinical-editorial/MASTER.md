@@ -24,6 +24,7 @@ component. No section-anchor navigation, no single long page.
 | `/expertise` | Expertise |
 | `/experience` | Experience (includes Credentials) |
 | `/research` | Research |
+| `/gallery` | Gallery (photographic record of the site's image slots) |
 | `/contact` | Contact |
 | `/consultation` | Book a Consultation (3-step form) |
 

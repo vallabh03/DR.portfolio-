@@ -9,6 +9,7 @@ import About from './pages/About'
 import Expertise from './pages/Expertise'
 import Experience from './pages/Experience'
 import Research from './pages/Research'
+import Gallery from './pages/Gallery'
 import Contact from './pages/Contact'
 import Consultation from './pages/Consultation'
 import { BOOK_PATH, documentTitle, legacyRedirects } from './data/navigation'
@@ -113,6 +114,7 @@ export default function App() {
               <Route path="/expertise" element={<Expertise />} />
               <Route path="/experience" element={<Experience />} />
               <Route path="/research" element={<Research />} />
+              <Route path="/gallery" element={<Gallery />} />
               <Route path="/contact" element={<Contact />} />
               <Route path={BOOK_PATH} element={<Consultation />} />
               {Object.entries(legacyRedirects).map(([from, to]) => (
