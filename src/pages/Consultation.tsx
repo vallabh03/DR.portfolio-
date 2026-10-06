@@ -1,10 +1,19 @@
-import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { doctor } from '../data/doctor'
-import { EASE, EASE_EXIT, EASE_IN_OUT, useEntrance } from '../lib/motion'
+import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import DrawLine from '../components/DrawLine'
 import Button, { ArrowRight } from '../components/Button'
+
+/**
+ * Consultation: an intake document. Three numbered parts with a label column,
+ * an error summary when a part needs attention, a review of the details before
+ * sending, and a formal record of the request once it is received. Margin notes
+ * say what happens next. Sending uses doctor.booking.endpoint when one is set;
+ * without one the request is acknowledged locally and nothing is sent.
+ */
 
 type Values = {
   name: string
@@ -16,15 +25,37 @@ type Values = {
   consent: boolean
 }
 
-type Errors = Partial<Record<keyof Values, string>>
+type Field = keyof Values
+type Errors = Partial<Record<Field, string>>
 
 const EMPTY: Values = { name: '', phone: '', email: '', date: '', time: '', message: '', consent: false }
 
-const STEPS: { title: string; fields: (keyof Values)[] }[] = [
+const STEPS: { title: string; fields: Field[] }[] = [
   { title: 'Your details', fields: ['name', 'phone', 'email'] },
   { title: 'Preferred time', fields: ['date', 'time'] },
   { title: 'Message and consent', fields: ['message', 'consent'] },
 ]
+
+const LABELS: Record<Field, string> = {
+  name: 'Full name',
+  phone: 'Phone',
+  email: 'Email',
+  date: 'Preferred date',
+  time: 'Preferred time',
+  message: 'Message',
+  consent: 'Consent',
+}
+
+const TIME_OPTIONS = [
+  { value: '', label: 'No preference' },
+  { value: 'morning', label: 'Morning' },
+  { value: 'midday', label: 'Midday' },
+  { value: 'afternoon', label: 'Afternoon' },
+  { value: 'evening', label: 'Evening' },
+]
+
+const fieldId = (f: Field) => `consult-${f}`
+const pad = (n: number) => String(n).padStart(2, '0')
 
 const today = () => {
   const d = new Date()
@@ -48,47 +79,160 @@ const validateStep = (step: number, v: Values): Errors => {
   return Object.fromEntries(STEPS[step].fields.filter((f) => all[f]).map((f) => [f, all[f]]))
 }
 
-const stepVariants = {
-  enter: (dir: number) => ({ opacity: 0, x: dir * 32 }),
-  center: { opacity: 1, x: 0, transition: { duration: 0.45, ease: EASE } },
-  exit: (dir: number) => ({ opacity: 0, x: dir * -24, transition: { duration: 0.22, ease: EASE_EXIT } }),
+/** Human-readable values for the review and the record. Nothing is inferred. */
+const NOT_SPECIFIED = 'Not specified'
+const formatDate = (iso: string) => {
+  if (!iso) return NOT_SPECIFIED
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 }
+const formatTime = (t: string) => TIME_OPTIONS.find((o) => o.value === t)?.label ?? NOT_SPECIFIED
+
+const summaryRows = (v: Values): { field: Field; step: number; value: string }[] => [
+  { field: 'name', step: 0, value: v.name.trim() },
+  { field: 'phone', step: 0, value: v.phone.trim() },
+  { field: 'email', step: 0, value: v.email.trim() },
+  { field: 'date', step: 1, value: formatDate(v.date) },
+  { field: 'time', step: 1, value: v.time ? formatTime(v.time) : formatTime('') },
+]
+
+/* ── Page ────────────────────────────────────────────────────────────────── */
 
 export default function Consultation() {
+  return (
+    <>
+      <Opening />
+      <BeforeYouBegin />
+      <section aria-label="Consultation request" className="container-page pb-16 pt-10 md:pb-24 md:pt-12 lg:pb-32">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
+          <div className="min-w-0 lg:col-span-8">
+            <IntakeDocument />
+          </div>
+          <aside className="lg:col-span-4">
+            <MarginNotes />
+          </aside>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ── 1. Opening ──────────────────────────────────────────────────────────── */
+
+function Opening() {
   const entrance = useEntrance()
+  return (
+    <section aria-labelledby="consultation-title" className="container-page pt-10 md:pt-16 lg:pt-24">
+      <div className="grid gap-8 lg:grid-cols-12 lg:items-end lg:gap-10">
+        <RevealText as="h1" id="consultation-title" lines={['Book a', 'consultation']} className="heading-1 lg:col-span-7" delay={0.1} immediate />
+        <motion.p className="lead measure lg:col-span-5 lg:pb-2" {...entrance(0.4)}>
+          Share a few details and the practice will be in touch to arrange a suitable time. Submitting this form sends a request. It
+          is not a confirmed appointment.
+        </motion.p>
+      </div>
+    </section>
+  )
+}
+
+/* ── 2. Before you begin: the existing urgent-concerns text, ahead of the form ── */
+
+function BeforeYouBegin() {
+  return (
+    <section aria-labelledby="before-title" className="container-page pt-10 md:pt-12">
+      <div className="relative grid gap-2 border-b border-line py-5 md:grid-cols-[13rem_1fr] md:gap-6">
+        <DrawLine immediate delay={0.5} duration={1.1} className="absolute inset-x-0 top-0 bg-fg/60" />
+        <h2 id="before-title" className="font-medium text-fg">
+          Before you begin
+        </h2>
+        <p className="measure text-fg/85">
+          This form is not monitored for emergencies. If you need urgent medical help, contact your local emergency services.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+/* ── 3. Margin notes ─────────────────────────────────────────────────────── */
+
+function MarginNotes() {
+  const steps = [
+    'Submitting this form sends a request. It is not a confirmed appointment.',
+    'The practice will contact you to arrange a time.',
+    'Your appointment is not confirmed until you hear back.',
+  ]
+  return (
+    <div className="lg:sticky lg:top-28">
+      <h2 className="heading-3">What happens next</h2>
+      <ol className="mt-5 border-t border-line">
+        {steps.map((s, i) => (
+          <li key={i} className="grid grid-cols-[2rem_1fr] gap-3 border-b border-line py-4">
+            <span aria-hidden className="font-serif tabular-nums text-brass">
+              {i + 1}
+            </span>
+            <span className="text-fg/85">{s}</span>
+          </li>
+        ))}
+      </ol>
+      <h2 className="heading-3 mt-10">Other ways to reach the practice</h2>
+      <Link to="/contact" className="group/btn mt-3 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
+        <span className="link-underline">Visit and contact</span>
+        <ArrowRight />
+      </Link>
+    </div>
+  )
+}
+
+/* ── 4. The intake document ──────────────────────────────────────────────── */
+
+function IntakeDocument() {
+  const animated = useDecorativeMotion()
   const [values, setValues] = useState<Values>(EMPTY)
   const [errors, setErrors] = useState<Errors>({})
+  const [showSummary, setShowSummary] = useState(false)
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(1)
   const [status, setStatus] = useState<'idle' | 'sending' | 'received' | 'error'>('idle')
+  const [record, setRecord] = useState<Values | null>(null)
+  const docRef = useRef<HTMLDivElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
-  const successRef = useRef<HTMLDivElement>(null)
-  const focusOnStep = useRef(false)
+  // Which field should receive focus when the next part mounts ('' = its first field).
+  const focusRequest = useRef<Field | '' | null>(null)
 
-  const set = <K extends keyof Values>(k: K, val: Values[K]) => {
+  // Clearing works from the latest errors, so the summary empties itself as each field is fixed.
+  const set = <K extends Field>(k: K, val: Values[K]) => {
     setValues((v) => ({ ...v, [k]: val }))
-    if (errors[k]) setErrors((e) => ({ ...e, [k]: undefined }))
+    setErrors((prev) => (prev[k] ? { ...prev, [k]: undefined } : prev))
   }
 
-  const focusFirstInvalid = (found: Errors) => {
-    const first = Object.keys(found)[0]
-    if (first) formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
+  /** Bring the top of the document into view if it has scrolled above the screen. */
+  const revealDocument = () => {
+    const el = docRef.current
+    if (!el) return
+    const top = el.getBoundingClientRect().top
+    if (top < 80) window.scrollTo({ top: top + window.scrollY - 96, behavior: animated ? 'smooth' : 'instant' })
   }
 
-  const goTo = (next: number) => {
+  const goTo = (next: number, focusField: Field | '' = '') => {
     setDirection(next > step ? 1 : -1)
-    focusOnStep.current = true
+    setErrors({})
+    setShowSummary(false)
+    focusRequest.current = focusField
     setStep(next)
+    requestAnimationFrame(revealDocument)
   }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (status === 'sending') return
     const found = validateStep(step, values)
     setErrors(found)
-    if (Object.keys(found).length) {
-      focusFirstInvalid(found)
+    const firstInvalid = STEPS[step].fields.find((f) => found[f])
+    if (firstInvalid) {
+      setShowSummary(true)
+      document.getElementById(fieldId(firstInvalid))?.focus()
       return
     }
+    setShowSummary(false)
     if (step < STEPS.length - 1) {
       goTo(step + 1)
       return
@@ -107,203 +251,163 @@ export default function Consultation() {
         // No backend configured yet: acknowledge locally without sending data.
         await new Promise((r) => setTimeout(r, 900))
       }
+      setRecord(values)
       setStatus('received')
       setValues(EMPTY)
       setStep(0)
-      requestAnimationFrame(() => successRef.current?.focus())
+      requestAnimationFrame(revealDocument)
     } catch {
       setStatus('error')
     }
   }
 
+  const reset = () => {
+    setStatus('idle')
+    setRecord(null)
+    focusRequest.current = ''
+  }
+
+  const stepVariants = animated
+    ? {
+        enter: (dir: number) => ({ opacity: 0, x: dir * 32 }),
+        center: { opacity: 1, x: 0, transition: { duration: 0.45, ease: EASE } },
+        exit: (dir: number) => ({ opacity: 0, x: dir * -24, transition: { duration: 0.22, ease: EASE_EXIT } }),
+      }
+    : { enter: { opacity: 1, x: 0 }, center: { opacity: 1, x: 0 }, exit: { opacity: 0, transition: { duration: 0 } } }
+
+  const swap = animated
+    ? { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } }, exit: { opacity: 0, transition: { duration: 0.2, ease: EASE_EXIT } } }
+    : { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0, transition: { duration: 0 } } }
+
+  const stepErrors = STEPS[step].fields.filter((f) => errors[f])
+
   return (
-    <section aria-labelledby="consultation-title" className="container-page pb-16 pt-10 md:pb-24 md:pt-16 lg:pb-32 lg:pt-24">
-      <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
-        <div className="lg:col-span-5 lg:sticky lg:top-32 lg:self-start">
-          <RevealText as="h1" id="consultation-title" lines={['Book a', 'consultation']} className="heading-1" delay={0.1} immediate />
-          <motion.div {...entrance(0.4)}>
-            <p className="lead measure mt-8">
-              Share a few details and the practice will be in touch to arrange a suitable time. Submitting this form sends a request.
-              It is not a confirmed appointment.
-            </p>
-            <div role="note" className="mt-8 max-w-md rounded-lg border border-line bg-surface p-6 leading-relaxed text-muted">
-              <span className="mb-1 block font-medium text-fg">Urgent concerns</span>
-              This form is not monitored for emergencies. If you need urgent medical help, contact your local emergency services.
-            </div>
+    <div ref={docRef} className="relative scroll-mt-28 overflow-hidden rounded-lg border border-line bg-surface">
+      <DrawLine immediate delay={0.3} duration={1.2} className="absolute inset-x-0 top-0 bg-accent" />
+      <AnimatePresence mode="wait" initial={false}>
+        {status === 'received' && record ? (
+          <motion.div key="record" {...swap}>
+            <RequestRecord record={record} onReset={reset} />
           </motion.div>
-        </div>
+        ) : (
+          <motion.form
+            key="form"
+            ref={formRef}
+            noValidate
+            onSubmit={onSubmit}
+            aria-labelledby="request-title"
+            aria-busy={status === 'sending'}
+            className="p-5 sm:p-8 lg:p-10"
+            {...swap}
+          >
+            <h2 id="request-title" className="sr-only">
+              Consultation request
+            </h2>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <Progress step={step} />
+              <p className="text-sm text-muted sm:pt-2">
+                Fields marked <span className="text-accent">*</span> are required
+              </p>
+            </div>
 
-        <div className="relative min-w-0 overflow-hidden rounded-lg border border-line bg-surface p-5 sm:p-10 lg:col-span-7">
-          <DrawLine immediate delay={0.3} duration={1.2} className="absolute inset-x-0 top-0 bg-accent" />
-          <AnimatePresence mode="wait" initial={false}>
-            {status === 'received' ? (
-              <motion.div
-                key="ok"
-                ref={successRef}
-                tabIndex={-1}
-                role="status"
-                className="flex min-h-[28rem] flex-col justify-center outline-none"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE_EXIT } }}
-                transition={{ duration: 0.5, ease: EASE }}
-              >
-                <svg viewBox="0 0 52 52" className="h-14 w-14 text-accent" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                  <motion.circle cx="26" cy="26" r="24" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.8, ease: EASE_IN_OUT }} />
-                  <motion.path
-                    d="M16 27l7 7 14-15"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.5, ease: EASE_IN_OUT, delay: 0.6 }}
-                  />
-                </svg>
-                <h2 className="heading-2 mt-8">Your request has been received.</h2>
-                <p className="lead mt-4 max-w-lg">The practice will contact you to arrange a time. Your appointment is not confirmed until you hear back.</p>
-                {import.meta.env.DEV && !doctor.booking.endpoint && (
-                  <p className="mt-4 text-sm text-muted">
-                    Development note: no form endpoint is configured in <code>src/data/doctor.ts</code>, so nothing was sent.
-                  </p>
-                )}
-                <div className="mt-10">
-                  <Button variant="secondary" onClick={() => setStatus('idle')}>
-                    Send another request
-                  </Button>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.form
-                key="form"
-                ref={formRef}
-                noValidate
-                onSubmit={onSubmit}
-                aria-labelledby="consultation-title"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE_EXIT } }}
-              >
-                <StepIndicator step={step} />
+            <div className="mt-10">
+              <AnimatePresence mode="wait" initial={false} custom={direction}>
+                <motion.fieldset key={step} custom={direction} variants={stepVariants} initial="enter" animate="center" exit="exit" className="min-w-0">
+                  <PartLegend step={step} direction={direction} />
+                  <FocusOnMount request={focusRequest} />
 
-                <div className="mt-10 min-h-[22rem]">
-                  <AnimatePresence mode="wait" initial={false} custom={direction}>
-                    <motion.fieldset
-                      key={step}
-                      custom={direction}
-                      variants={stepVariants}
-                      initial="enter"
-                      animate="center"
-                      exit="exit"
-                      className="min-w-0"
-                      onAnimationStart={(def) => {
-                        // Once the new step is on screen, move focus to its first field.
-                        if (def !== 'center' || !focusOnStep.current) return
-                        focusOnStep.current = false
-                        formRef.current?.querySelector<HTMLElement>('fieldset input, fieldset select, fieldset textarea')?.focus()
-                      }}
-                    >
-                      <legend className="heading-3 mb-6">{STEPS[step].title}</legend>
+                  <div className="clear-both" />
+                  <ErrorSummary visible={showSummary && stepErrors.length > 0} fields={stepErrors} errors={errors} />
 
-                      {step === 0 && (
-                        <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2">
-                          <Field label="Full name" name="name" required error={errors.name} className="sm:col-span-2">
-                            {(p) => <input {...p} type="text" autoComplete="name" value={values.name} onChange={(e) => set('name', e.target.value)} />}
-                          </Field>
-                          <Field label="Phone" name="phone" required error={errors.phone}>
-                            {(p) => <input {...p} type="tel" inputMode="tel" autoComplete="tel" value={values.phone} onChange={(e) => set('phone', e.target.value)} />}
-                          </Field>
-                          <Field label="Email" name="email" required error={errors.email}>
-                            {(p) => <input {...p} type="email" autoComplete="email" value={values.email} onChange={(e) => set('email', e.target.value)} />}
-                          </Field>
-                        </div>
-                      )}
-
-                      {step === 1 && (
-                        <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2">
-                          <Field label="Preferred date" name="date" error={errors.date} hint="Optional.">
-                            {(p) => <input {...p} type="date" min={today()} value={values.date} onChange={(e) => set('date', e.target.value)} />}
-                          </Field>
-                          <Field label="Preferred time" name="time" error={errors.time} hint="Optional.">
-                            {(p) => (
-                              <select {...p} value={values.time} onChange={(e) => set('time', e.target.value)}>
-                                <option value="">No preference</option>
-                                <option value="morning">Morning</option>
-                                <option value="midday">Midday</option>
-                                <option value="afternoon">Afternoon</option>
-                                <option value="evening">Evening</option>
-                              </select>
-                            )}
-                          </Field>
-                        </div>
-                      )}
-
-                      {step === 2 && (
-                        <div className="grid gap-y-6">
-                          <Field label="Message" name="message" error={errors.message} hint="Optional. Please don’t include detailed medical records.">
-                            {(p) => <textarea {...p} rows={5} maxLength={1000} value={values.message} onChange={(e) => set('message', e.target.value)} />}
-                          </Field>
-                          <div>
-                            <label className="flex min-h-11 cursor-pointer items-start gap-3 leading-relaxed text-muted">
-                              <input
-                                type="checkbox"
-                                name="consent"
-                                checked={values.consent}
-                                onChange={(e) => set('consent', e.target.checked)}
-                                aria-invalid={!!errors.consent}
-                                aria-describedby={errors.consent ? 'consent-error' : undefined}
-                                className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--accent)]"
-                              />
-                              <span>I understand this is a request, not a confirmed appointment, and agree that the practice may contact me about it.</span>
-                            </label>
-                            {errors.consent && (
-                              <p id="consent-error" className="mt-2 text-sm text-danger">
-                                {errors.consent}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </motion.fieldset>
-                  </AnimatePresence>
-                </div>
-
-                <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
-                  {step > 0 ? (
-                    <Button variant="secondary" onClick={() => goTo(step - 1)}>
-                      Back
-                    </Button>
-                  ) : (
-                    <span className="hidden sm:block" />
+                  {step === 0 && (
+                    <div className="mt-6">
+                      <Row field="name" required error={errors.name} index={0}>
+                        {(p) => <input {...p} type="text" autoComplete="name" value={values.name} onChange={(e) => set('name', e.target.value)} />}
+                      </Row>
+                      <Row field="phone" required error={errors.phone} index={1}>
+                        {(p) => <input {...p} type="tel" inputMode="tel" autoComplete="tel" value={values.phone} onChange={(e) => set('phone', e.target.value)} />}
+                      </Row>
+                      <Row field="email" required error={errors.email} index={2}>
+                        {(p) => <input {...p} type="email" autoComplete="email" value={values.email} onChange={(e) => set('email', e.target.value)} />}
+                      </Row>
+                    </div>
                   )}
-                  <Button type="submit" disabled={status === 'sending'} className="w-full sm:w-auto">
-                    {step < STEPS.length - 1 ? 'Continue' : status === 'sending' ? 'Sending…' : 'Request consultation'} <ArrowRight />
-                  </Button>
-                </div>
-                <AnimatePresence>
-                  {status === 'error' && (
-                    <motion.p role="alert" className="mt-4 text-sm text-danger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE_EXIT } }}>
-                      Something went wrong. Please try again, or contact the practice directly.
-                    </motion.p>
+
+                  {step === 1 && (
+                    <div className="mt-6">
+                      <Row field="date" error={errors.date} hint="Optional." index={0}>
+                        {(p) => <input {...p} type="date" min={today()} value={values.date} onChange={(e) => set('date', e.target.value)} />}
+                      </Row>
+                      <Row field="time" error={errors.time} hint="Optional." index={1}>
+                        {(p) => (
+                          <select {...p} value={values.time} onChange={(e) => set('time', e.target.value)}>
+                            {TIME_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </Row>
+                    </div>
                   )}
-                </AnimatePresence>
-              </motion.form>
+
+                  {step === 2 && (
+                    <div className="mt-6">
+                      <Review values={values} onEdit={(s, f) => goTo(s, f)} />
+                      <Row field="message" error={errors.message} hint="Optional. Please don’t include detailed medical records." index={1}>
+                        {(p) => <textarea {...p} rows={5} maxLength={1000} value={values.message} onChange={(e) => set('message', e.target.value)} />}
+                      </Row>
+                      <ConsentRow checked={values.consent} error={errors.consent} onChange={(c) => set('consent', c)} />
+                    </div>
+                  )}
+                </motion.fieldset>
+              </AnimatePresence>
+            </div>
+
+            <div className="mt-10 flex flex-col gap-3 border-t border-line pt-6 sm:flex-row-reverse sm:items-center sm:justify-between">
+              <Button type="submit" disabled={status === 'sending'} className="w-full sm:w-auto">
+                {step < STEPS.length - 1 ? 'Continue' : status === 'sending' ? 'Sending…' : 'Request consultation'} <ArrowRight />
+              </Button>
+              {step > 0 && (
+                <Button variant="secondary" onClick={() => goTo(step - 1)} className="w-full sm:w-auto">
+                  Back
+                </Button>
+              )}
+            </div>
+            {status === 'error' && (
+              <p role="alert" className="mt-4 text-sm text-danger">
+                Something went wrong. Please try again, or contact the practice directly.
+              </p>
             )}
-          </AnimatePresence>
-        </div>
-      </div>
-    </section>
+          </motion.form>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
-/** Three numbered steps joined by a rule that fills as you progress. */
-function StepIndicator({ step }: { step: number }) {
+/** Moves focus once the new part has mounted: to a requested field, or the part's first field. */
+function FocusOnMount({ request }: { request: { current: Field | '' | null } }) {
+  useEffect(() => {
+    const target = request.current
+    if (target === null) return
+    request.current = null
+    const el = target ? document.getElementById(fieldId(target)) : document.querySelector<HTMLElement>('fieldset input, fieldset select, fieldset textarea')
+    el?.focus({ preventScroll: true })
+  }, [request])
+  return null
+}
+
+/* ── Progress: three numbered parts joined by a hairline ─────────────────── */
+
+function Progress({ step }: { step: number }) {
   return (
-    <div>
+    <div className="min-w-0 sm:w-[24rem]">
       <p className="sr-only" aria-live="polite">
-        Step {step + 1} of {STEPS.length}: {STEPS[step].title}
+        Part {step + 1} of {STEPS.length}: {STEPS[step].title}
       </p>
       <ol aria-hidden className="relative grid grid-cols-3">
-        {/* Track between the first and last markers, and its fill */}
         <span className="absolute left-[1.125rem] right-[calc(33.333%-1.125rem)] top-[1.0625rem] h-px bg-line-strong" />
         <motion.span
           className="absolute left-[1.125rem] right-[calc(33.333%-1.125rem)] top-[1.0625rem] h-px origin-left bg-accent"
@@ -315,27 +419,89 @@ function StepIndicator({ step }: { step: number }) {
           const done = i < step
           const current = i === step
           return (
-            <li key={s.title} className="relative flex flex-col items-start gap-3">
+            <li key={s.title} className="relative flex flex-col items-start gap-2">
+              {/* Shape as well as colour: filled when done, ringed when current, open ahead */}
               <span
                 className={`relative z-10 flex h-9 w-9 items-center justify-center rounded-full border font-serif tabular-nums transition-colors duration-500 ${
-                  done ? 'border-accent bg-accent text-on-accent' : current ? 'border-accent bg-surface text-accent' : 'border-line-strong bg-surface text-muted'
+                  done ? 'border-accent bg-accent text-on-accent' : current ? 'border-accent bg-surface text-accent ring-1 ring-accent ring-offset-2 ring-offset-surface' : 'border-line-strong bg-surface text-muted'
                 }`}
               >
                 {i + 1}
               </span>
-              <span className={`hidden text-sm sm:block ${current ? 'text-fg' : 'text-muted'}`}>{s.title}</span>
+              <span className={`hidden text-sm sm:block ${current ? 'font-medium text-fg' : 'text-muted'}`}>{s.title}</span>
             </li>
           )
         })}
       </ol>
-      <p className="mt-4 text-sm text-muted sm:hidden" aria-hidden>
-        Step {step + 1} of {STEPS.length}
+      <p aria-hidden className="mt-3 text-sm text-muted sm:hidden">
+        Part {step + 1} of {STEPS.length} · {STEPS[step].title}
       </p>
     </div>
   )
 }
 
-type FieldProps = {
+/** The part's legend: a large brass numeral, rolling with the direction of travel, and the title. */
+function PartLegend({ step, direction }: { step: number; direction: number }) {
+  const animated = useDecorativeMotion()
+  return (
+    <legend className="float-left flex w-full items-baseline gap-4">
+      <span aria-hidden className="relative inline-block h-[1.1em] overflow-hidden font-serif text-[clamp(2.75rem,2.2rem+2vw,3.75rem)] leading-[1.1] tabular-nums text-brass">
+        <motion.span
+          key={step}
+          className="block"
+          initial={animated ? { y: direction > 0 ? '100%' : '-100%' } : false}
+          animate={{ y: '0%' }}
+          transition={{ duration: 0.45, ease: EASE }}
+        >
+          {pad(step + 1)}
+        </motion.span>
+      </span>
+      <span className="heading-3">{STEPS[step].title}</span>
+    </legend>
+  )
+}
+
+/* ── Error summary ───────────────────────────────────────────────────────── */
+
+function ErrorSummary({ visible, fields, errors }: { visible: boolean; fields: Field[]; errors: Errors }) {
+  const animated = useDecorativeMotion()
+  const focusField = (e: MouseEvent<HTMLAnchorElement>, f: Field) => {
+    e.preventDefault()
+    document.getElementById(fieldId(f))?.focus()
+  }
+  return (
+    <AnimatePresence initial={false}>
+      {visible && (
+        <motion.div
+          key="summary"
+          className="overflow-hidden"
+          initial={animated ? { height: 0 } : false}
+          animate={{ height: 'auto', transition: { duration: animated ? 0.3 : 0, ease: EASE_IN_OUT } }}
+          exit={{ height: 0, transition: { duration: animated ? 0.2 : 0, ease: EASE_EXIT } }}
+        >
+          <div role="alert" aria-labelledby="error-summary-title" className="mt-6 border-y border-danger/60 py-4">
+            <p id="error-summary-title" className="font-medium text-danger">
+              Please check these fields
+            </p>
+            <ul className="mt-2">
+              {fields.map((f) => (
+                <li key={f}>
+                  <a href={`#${fieldId(f)}`} onClick={(e) => focusField(e, f)} className="inline-flex min-h-11 items-center text-danger underline underline-offset-4">
+                    {LABELS[f]}: {errors[f]}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ── Rows: label column beside the field (stacked on phones) ─────────────── */
+
+type ControlProps = {
   id: string
   name: string
   required?: boolean
@@ -344,56 +510,182 @@ type FieldProps = {
   className: string
 }
 
-function Field({
-  label,
-  name,
+function Row({
+  field,
   required,
   error,
   hint,
-  className = '',
+  index,
   children,
 }: {
-  label: string
-  name: string
+  field: Field
   required?: boolean
   error?: string
   hint?: string
-  className?: string
-  children: (p: FieldProps) => ReactNode
+  index: number
+  children: (p: ControlProps) => ReactNode
 }) {
-  const id = useId()
-  const describedBy = [error ? `${id}-err` : '', hint ? `${id}-hint` : ''].filter(Boolean).join(' ') || undefined
+  const id = fieldId(field)
+  const describedBy = [hint ? `${id}-hint` : '', error ? `${id}-err` : ''].filter(Boolean).join(' ') || undefined
   return (
-    <div className={className}>
-      <label htmlFor={id} className="flex items-center gap-1 text-[0.9375rem] font-medium text-fg">
-        {label}
-        {required && (
-          <span aria-hidden className="text-accent">
-            *
-          </span>
+    <div className="group/row relative grid gap-2 py-5 md:grid-cols-[10rem_1fr] md:gap-6 lg:grid-cols-[12rem_1fr]">
+      <DrawLine immediate delay={0.1 + index * 0.06} duration={0.6} className="absolute inset-x-0 top-0 bg-line transition-colors" />
+      {/* The row's rule turns teal while its field has focus */}
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px origin-left scale-x-0 bg-accent transition-transform duration-300 group-focus-within/row:scale-x-100" />
+      <div className="md:pt-3">
+        <label htmlFor={id} className="flex items-baseline gap-1 text-[0.9375rem] font-medium text-fg transition-colors duration-200 group-focus-within/row:text-accent">
+          {LABELS[field]}
+          {required && (
+            <span aria-hidden className="text-accent">
+              *
+            </span>
+          )}
+        </label>
+        {hint && (
+          <p id={`${id}-hint`} className="mt-1 text-sm text-muted">
+            {hint}
+          </p>
         )}
-      </label>
-      <div className="mt-2">
+      </div>
+      <div className="min-w-0">
         {children({
           id,
-          name,
+          name: field,
           required,
           'aria-invalid': !!error,
           'aria-describedby': describedBy,
           className:
-            'block min-h-12 w-full rounded-sm border border-line-strong bg-bg px-4 py-3 text-base text-fg transition-colors duration-200 placeholder:text-muted hover:border-fg/60 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent aria-[invalid=true]:border-danger [&>option]:bg-surface [&>option]:text-fg',
+            'block min-h-12 w-full rounded-sm border border-line-strong bg-bg px-4 py-3 text-base text-fg transition-colors duration-200 placeholder:text-muted hover:border-fg/60 focus:border-accent focus:outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent aria-[invalid=true]:border-danger [&>option]:bg-surface [&>option]:text-fg',
         })}
+        {error && (
+          <p id={`${id}-err`} className="mt-2 text-sm text-danger">
+            <span className="sr-only">Error: </span>
+            {error}
+          </p>
+        )}
       </div>
-      {hint && !error && (
-        <p id={`${id}-hint`} className="mt-2 text-sm text-muted">
-          {hint}
-        </p>
-      )}
+    </div>
+  )
+}
+
+function ConsentRow({ checked, error, onChange }: { checked: boolean; error?: string; onChange: (c: boolean) => void }) {
+  const id = fieldId('consent')
+  return (
+    <div className="relative py-5">
+      <DrawLine immediate delay={0.22} duration={0.6} className="absolute inset-x-0 top-0 bg-line" />
+      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-start gap-3 leading-relaxed text-fg/85">
+        <input
+          id={id}
+          type="checkbox"
+          name="consent"
+          required
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-err` : undefined}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--accent)]"
+        />
+        <span>
+          I understand this is a request, not a confirmed appointment, and agree that the practice may contact me about it.
+          <span aria-hidden className="ml-1 text-accent">
+            *
+          </span>
+        </span>
+      </label>
       {error && (
         <p id={`${id}-err`} className="mt-2 text-sm text-danger">
+          <span className="sr-only">Error: </span>
           {error}
         </p>
       )}
+    </div>
+  )
+}
+
+/* ── Review (part 3): the details entered so far, each editable ──────────── */
+
+function Review({ values, onEdit }: { values: Values; onEdit: (step: number, field: Field) => void }) {
+  return (
+    <div className="relative py-5">
+      <DrawLine immediate delay={0.1} duration={0.6} className="absolute inset-x-0 top-0 bg-line" />
+      <h3 className="text-[0.9375rem] font-medium text-fg">Your details</h3>
+      <dl className="mt-3">
+        {summaryRows(values).map((r) => (
+          <div key={r.field} className="grid grid-cols-[1fr_auto] items-center gap-x-4 border-b border-line py-1 last:border-b-0 sm:grid-cols-[10rem_1fr_auto] lg:grid-cols-[12rem_1fr_auto]">
+            <dt className="text-sm text-muted">{LABELS[r.field]}</dt>
+            <dd className={`col-start-1 row-start-2 min-w-0 break-words sm:col-start-auto sm:row-start-auto ${r.value === NOT_SPECIFIED ? 'text-muted' : 'text-fg'}`}>
+              {r.value}
+            </dd>
+            <dd className="col-start-2 row-span-2 row-start-1 sm:col-start-auto sm:row-span-1 sm:row-start-auto">
+              <button
+                type="button"
+                onClick={() => onEdit(r.step, r.field)}
+                className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-accent hover:text-accent-hover"
+              >
+                <span className="link-underline">Edit</span>
+                <span className="sr-only"> {LABELS[r.field].toLowerCase()}</span>
+              </button>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+/* ── The request record: shown once the request is received ──────────────── */
+
+function RequestRecord({ record, onReset }: { record: Values; onReset: () => void }) {
+  const animated = useDecorativeMotion()
+  const ref = useRef<HTMLDivElement>(null)
+  // Focus the record once it is on screen (it mounts after the form has left).
+  useEffect(() => {
+    ref.current?.focus({ preventScroll: true })
+  }, [])
+  const rows: { label: string; value: string }[] = [
+    ...summaryRows(record).map((r) => ({ label: LABELS[r.field], value: r.value })),
+    { label: 'Message included', value: record.message.trim() ? 'Yes' : 'No' },
+  ]
+
+  return (
+    <div ref={ref} tabIndex={-1} role="status" aria-labelledby="record-title" className="p-5 outline-none sm:p-8 lg:p-10">
+      <svg viewBox="0 0 52 52" className="h-14 w-14 text-accent" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+        <motion.circle cx="26" cy="26" r="24" initial={animated ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: 0.6, ease: EASE_IN_OUT }} />
+        <motion.path
+          d="M16 27l7 7 14-15"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={animated ? { pathLength: 0 } : false}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 0.4, ease: EASE_IN_OUT, delay: 0.5 }}
+        />
+      </svg>
+      <h2 id="record-title" className="heading-2 mt-8">
+        Your request has been received.
+      </h2>
+      <p className="lead measure mt-4">The practice will contact you to arrange a time. Your appointment is not confirmed until you hear back.</p>
+
+      <h3 className="mt-10 text-[0.9375rem] font-medium text-fg">Request record</h3>
+      <dl className="mt-3">
+        {rows.map((r, i) => (
+          <div key={r.label} className="relative grid gap-1 py-3 sm:grid-cols-[12rem_1fr] sm:gap-6">
+            <DrawLine immediate delay={0.7 + i * 0.06} duration={0.6} className="absolute inset-x-0 top-0 bg-line-strong" />
+            <dt className="text-sm text-muted">{r.label}</dt>
+            <dd className={`min-w-0 break-words ${r.value === NOT_SPECIFIED ? 'text-muted' : 'text-fg'}`}>{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {import.meta.env.DEV && !doctor.booking.endpoint && (
+        <p className="mt-6 text-sm text-muted">
+          Development note: no form endpoint is configured in <code>src/data/doctor.ts</code>, so nothing was sent.
+        </p>
+      )}
+      <div className="mt-10">
+        <Button variant="secondary" onClick={onReset}>
+          Send another request
+        </Button>
+      </div>
     </div>
   )
 }
