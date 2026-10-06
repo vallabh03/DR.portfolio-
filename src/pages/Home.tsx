@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import { Link } from 'react-router'
 import { doctor, isPlaceholder } from '../data/doctor'
-import { BOOK_PATH, navRoutes, showTestimonials } from '../data/navigation'
+import { BOOK_PATH, showTestimonials } from '../data/navigation'
 import { useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import MedicalImage from '../components/MedicalImage'
@@ -12,49 +12,71 @@ import Button, { ArrowRight } from '../components/Button'
 import Testimonials from '../components/Testimonials'
 import BookingPrompt from '../components/BookingPrompt'
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * Home: the page that sets the visual language for the whole site.
+ *
+ * Motion budget (MASTER.md §5): the name reveal and the portrait opening are
+ * the only primary motion. Everything else is supporting: a faint grid, crop
+ * marks, and rules that draw once as they arrive. Body content is never faded
+ * in on scroll; it is simply there.
+ */
 export default function Home() {
+  return (
+    <>
+      <Hero />
+      <ApproachSpread />
+      <FocusIndex />
+      <RecordSpread />
+      {showTestimonials && <Testimonials />}
+      <BookingPrompt />
+    </>
+  )
+}
+
+/* ── 1. Hero: masthead name, portrait in an arch, and the practice at a glance ── */
+function Hero() {
   const entrance = useEntrance()
   const facts = [
     { k: 'Specialty', v: doctor.title },
-    { k: 'Practice', v: doctor.contact.clinic },
+    { k: 'Practice', v: doctor.contact.clinic, link: { to: '/contact', label: 'Directions and hours' } },
     { k: 'Languages', v: doctor.about.languages.join(', ') },
   ]
-  const pages = navRoutes.filter((r) => r.path !== '/')
 
   return (
-    <>
-      {/* ── Hero. Primary motion: the name rises and the portrait opens.
-          Supporting details (grid, crop marks) arrive faintly afterwards. ── */}
-      <section aria-labelledby="home-title" className="relative isolate">
-        <GridLines delay={1.1} />
-        <div className="container-page pb-16 pt-10 md:pb-24 md:pt-16 lg:pb-28 lg:pt-20">
-          <div className="grid items-end gap-12 lg:grid-cols-12 lg:gap-10">
-            <div className="lg:col-span-7 lg:pb-6">
-              <RevealText as="h1" id="home-title" lines={[doctor.firstLine, doctor.lastLine]} className="display-hero" delay={0.1} immediate />
-              {/* Supporting copy settles as one group once the name has landed */}
-              <motion.div {...entrance(0.7)}>
-                <p className={`mt-6 text-lg ${isPlaceholder(doctor.title) ? 'text-muted' : 'text-fg'}`}>{doctor.title}</p>
-                <span aria-hidden className="mt-8 block h-px max-w-md bg-accent" />
-                <p className="mt-8 font-serif text-[clamp(1.375rem,1.15rem+1vw,2rem)] leading-[1.3] tracking-[-0.01em] text-fg/85">
-                  {doctor.statement.map((s, i) => (
-                    <span key={i} className="block">
-                      {s}
-                    </span>
-                  ))}
-                </p>
-                <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Button to={BOOK_PATH}>
-                    Book a consultation <ArrowRight />
-                  </Button>
-                  <Button to="/about" variant="secondary">
-                    About Dr. Thaduri
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
+    <section aria-labelledby="home-title" className="relative isolate">
+      <GridLines delay={1.1} />
+      <div className="container-page pb-16 pt-10 md:pb-20 md:pt-16 lg:pt-20">
+        <div className="grid items-end gap-12 lg:grid-cols-12 lg:gap-10">
+          <div className="lg:col-span-7 lg:pb-4">
+            <RevealText as="h1" id="home-title" lines={[doctor.firstLine, doctor.lastLine]} className="display-hero" delay={0.1} immediate />
 
-            <div className="lg:col-span-5">
-              <div className="relative mx-auto w-full max-w-[24rem] lg:mr-0 lg:max-w-none">
+            {/* Supporting copy settles as one group once the name has landed */}
+            <motion.div {...entrance(0.7)}>
+              <p className={`mt-6 text-lg ${isPlaceholder(doctor.title) ? 'text-muted' : 'text-fg'}`}>{doctor.title}</p>
+              <span aria-hidden className="mt-8 block h-px w-24 bg-accent" />
+              <p className="mt-8 max-w-xl font-serif text-[clamp(1.375rem,1.15rem+1vw,2rem)] leading-[1.3] tracking-[-0.01em] text-fg/85">
+                {doctor.statement.map((s, i) => (
+                  <span key={i} className="block">
+                    {s}
+                  </span>
+                ))}
+              </p>
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <Button to={BOOK_PATH}>
+                  Book a consultation <ArrowRight />
+                </Button>
+                <Button to="/about" variant="secondary">
+                  About Dr. Thaduri
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="lg:col-span-5">
+            <figure className="mx-auto w-full max-w-[24rem] lg:mr-0 lg:max-w-none">
+              <div className="relative">
                 <MedicalImage
                   src="/images/doctor-hero.jpg"
                   sizes="(min-width: 1024px) 38vw, min(24rem, 100vw)"
@@ -67,61 +89,204 @@ export default function Home() {
                 />
                 <CropMarks delay={1.4} />
               </div>
-            </div>
+              {/* Editorial caption, as a publication would credit a portrait */}
+              <figcaption className="mt-5 flex items-baseline justify-between gap-4 text-sm text-muted">
+                <span>{doctor.name}</span>
+                <span className={`text-right ${isPlaceholder(doctor.contact.clinic) ? '' : 'text-fg/80'}`}>{doctor.contact.clinic}</span>
+              </figcaption>
+            </figure>
           </div>
         </div>
-      </section>
 
-      {/* ── At a glance ── */}
-      <section aria-label="At a glance" className="container-page">
-        <p className="measure text-muted">A digital portfolio of clinical practice: experience, credentials and approach to care.</p>
-        <div className="relative mt-6">
-          <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.2} />
-          <dl className="grid sm:grid-cols-3">
-            {facts.map((f, i) => (
-              <div key={f.k} className={`py-5 sm:py-7 ${i > 0 ? 'border-t border-line sm:border-l sm:border-t-0 sm:pl-6' : ''}`}>
-                <dt className="label">{f.k}</dt>
-                <dd className={`mt-2 ${isPlaceholder(f.v) ? 'text-muted' : ''}`}>{f.v}</dd>
-              </div>
-            ))}
-          </dl>
-          <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.2} delay={0.15} />
+        {/* At a glance */}
+        <div className="mt-16 md:mt-20">
+          <p className="measure text-muted">A digital portfolio of clinical practice: experience, credentials and approach to care.</p>
+          <div className="relative mt-6">
+            <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.2} />
+            <dl className="grid sm:grid-cols-3">
+              {facts.map((f, i) => (
+                <div key={f.k} className={`py-5 sm:py-7 ${i > 0 ? 'border-t border-line sm:border-l sm:border-t-0 sm:pl-6' : ''}`}>
+                  <dt className="label">{f.k}</dt>
+                  <dd className="mt-2">
+                    <span className={isPlaceholder(f.v) ? 'text-muted' : ''}>{f.v}</span>
+                    {f.link && (
+                      <Link to={f.link.to} className="group/btn mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-accent hover:text-accent-hover">
+                        <span className="link-underline">{f.link.label}</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.2} delay={0.15} />
+          </div>
         </div>
-      </section>
+      </div>
+    </section>
+  )
+}
 
-      {/* ── Index of pages ── */}
-      <section aria-labelledby="index-title" className="container-page section-y">
+/* ── 2. Approach: the philosophy as a pull quote, and the five stages as a drawn sequence ── */
+function ApproachSpread() {
+  const { philosophy } = doctor.about
+  const stages = doctor.approach
+
+  return (
+    <section aria-labelledby="approach-title" className="border-y border-line bg-surface">
+      <div className="container-page section-y">
         <div className="grid gap-10 lg:grid-cols-12">
-          <RevealText as="h2" id="index-title" lines={['Inside the practice']} className="heading-2 lg:col-span-4" />
-          <ol className="lg:col-span-8">
-            {pages.map((p, i) => (
-              <li key={p.path} className="relative">
-                <DrawLine className="absolute inset-x-0 top-0 bg-line" delay={i * 0.06} />
-                <Link
-                  to={p.path}
-                  className="group grid grid-cols-[2.25rem_1fr_auto] items-center gap-4 py-6 sm:grid-cols-[3rem_1fr_1fr_auto] sm:py-8"
+          <RevealText as="h2" id="approach-title" lines={['Approach to care']} className="heading-2 lg:col-span-4" />
+          <figure className="lg:col-span-8">
+            <blockquote
+              className={`font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.5rem)] leading-[1.3] tracking-[-0.01em] ${
+                isPlaceholder(philosophy) ? 'text-muted' : ''
+              }`}
+            >
+              {philosophy}
+            </blockquote>
+            <figcaption className="mt-6 flex items-center gap-4 text-sm text-muted">
+              <DrawLine className="w-10 bg-brass" duration={0.7} />
+              Clinical philosophy, {doctor.name}
+            </figcaption>
+          </figure>
+        </div>
+
+        {/* The consultation sequence: a teal line draws through the five stages */}
+        <div className="mt-16 md:mt-24">
+          <h3 className="sr-only">How a consultation unfolds</h3>
+          <ol className="relative grid gap-0 lg:grid-cols-5 lg:gap-6">
+            {/* Desktop: horizontal line through the markers */}
+            <div aria-hidden className="absolute inset-x-0 top-5 hidden lg:block">
+              <span className="absolute inset-x-0 top-0 h-px bg-line" />
+              <DrawLine className="absolute inset-x-0 top-0 bg-accent" duration={1.6} />
+            </div>
+            {/* Mobile: vertical line from the first marker to the last */}
+            <div aria-hidden className="absolute bottom-8 left-5 top-8 lg:hidden">
+              <span className="absolute inset-y-0 left-0 w-px bg-line" />
+              <DrawLine axis="y" className="absolute inset-y-0 left-0 bg-accent" duration={1.6} />
+            </div>
+
+            {stages.map((s, i) => (
+              <li key={s.title} className="relative grid grid-cols-[2.5rem_1fr] items-center gap-5 py-3 lg:flex lg:flex-col lg:items-start lg:gap-5 lg:py-0">
+                <span
+                  aria-hidden
+                  className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-accent bg-surface font-serif tabular-nums text-accent"
                 >
-                  <span className="font-serif text-lg tabular-nums text-brass">0{i + 1}</span>
-                  <span className="font-serif text-[clamp(1.75rem,1.4rem+1.4vw,2.5rem)] leading-none tracking-[-0.015em] transition-[transform,color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-2 group-hover:text-accent">
-                    {p.label}
-                  </span>
-                  <span className="hidden text-muted sm:block">{p.blurb}</span>
-                  <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-line-strong transition-colors duration-300 group-hover:border-accent group-hover:text-accent">
-                    <ArrowRight className="group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
+                  {i + 1}
+                </span>
+                <span className="font-serif text-[clamp(1.25rem,1.15rem+0.4vw,1.5rem)] leading-tight">
+                  <span className="sr-only">Stage {i + 1}: </span>
+                  {s.title}
+                </span>
               </li>
             ))}
-            <li aria-hidden className="relative">
-              <DrawLine className="absolute inset-x-0 top-0 bg-line" delay={pages.length * 0.06} />
-            </li>
           </ol>
+          <Link to="/about" className="group/btn mt-10 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover md:mt-12">
+            <span className="link-underline">How a consultation unfolds</span>
+            <ArrowRight />
+          </Link>
         </div>
-      </section>
+      </div>
+    </section>
+  )
+}
 
-      {showTestimonials && <Testimonials />}
+/* ── 3. Areas of clinical focus: an editorial two-column index ── */
+function FocusIndex() {
+  const items = doctor.expertise
 
-      <BookingPrompt />
-    </>
+  return (
+    <section aria-labelledby="focus-title" className="container-page section-y">
+      <div className="grid gap-10 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <RevealText as="h2" id="focus-title" lines={['Areas of', 'clinical focus']} className="heading-2" />
+          <p className="measure mt-6 text-muted">Only verified specialties are listed. Each area links to the conditions and procedures it covers.</p>
+        </div>
+
+        <ol className="grid gap-x-10 sm:grid-cols-2 lg:col-span-8">
+          {items.map((item, i) => (
+            <li key={i} className="relative">
+              <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={(i % 2) * 0.08} />
+              <Link to="/expertise" className="group block py-7 md:py-9">
+                <span aria-hidden className="font-serif tabular-nums text-brass">
+                  {pad(i + 1)}
+                </span>
+                <h3
+                  className={`heading-3 mt-3 transition-[transform,color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1.5 group-hover:text-accent ${
+                    isPlaceholder(item.title) ? 'text-fg/75' : ''
+                  }`}
+                >
+                  {item.title}
+                </h3>
+                <p className={`mt-3 ${isPlaceholder(item.description) ? 'text-muted' : 'text-fg/85'}`}>{item.description}</p>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="mt-6 lg:ml-[calc(33.333%+0.833rem)]">
+        <Link to="/expertise" className="group/btn inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
+          <span className="link-underline">All areas of care</span>
+          <ArrowRight />
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+/* ── 4. Record: recent roles as a short timeline, beside research interests ── */
+function RecordSpread() {
+  const roles = doctor.experience.slice(0, 3)
+
+  return (
+    <section aria-label="Experience and research" className="border-t border-line">
+      <div className="container-page section-y">
+        <div className="grid gap-16 lg:grid-cols-12 lg:gap-10">
+          {/* Experience */}
+          <div className="lg:col-span-7">
+            <RevealText as="h2" lines={['Track record']} className="heading-2" />
+            <ol className="relative mt-10 border-l border-line pl-7 sm:pl-10">
+              <DrawLine axis="y" className="absolute -left-px bottom-0 top-0 bg-accent" duration={1.4} />
+              {roles.map((r, i) => (
+                <li key={i} className="relative pb-9 last:pb-0">
+                  <span aria-hidden className="absolute -left-[calc(1.75rem+5px)] top-2 h-[9px] w-[9px] rounded-full border border-accent bg-bg sm:-left-[calc(2.5rem+5px)]" />
+                  <p className="font-serif tabular-nums text-brass">{r.year}</p>
+                  <h3 className={`heading-3 mt-1 ${isPlaceholder(r.role) ? 'text-fg/75' : ''}`}>{r.role}</h3>
+                  <p className="mt-1 text-muted">
+                    {r.institution}
+                    {r.location ? `, ${r.location}` : ''}
+                  </p>
+                </li>
+              ))}
+            </ol>
+            <Link to="/experience" className="group/btn mt-10 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
+              <span className="link-underline">Full timeline and credentials</span>
+              <ArrowRight />
+            </Link>
+          </div>
+
+          {/* Research */}
+          <div className="lg:col-span-4 lg:col-start-9">
+            <RevealText as="h2" lines={['Research interests']} className="heading-2" />
+            <ul className="mt-10">
+              {doctor.researchInterests.map((r, i) => (
+                <li key={i} className={`relative py-4 ${isPlaceholder(r) ? 'text-muted' : ''}`}>
+                  <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={i * 0.08} />
+                  {r}
+                </li>
+              ))}
+              <li aria-hidden className="relative">
+                <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={doctor.researchInterests.length * 0.08} />
+              </li>
+            </ul>
+            <Link to="/research" className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
+              <span className="link-underline">Research and publications</span>
+              <ArrowRight />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
