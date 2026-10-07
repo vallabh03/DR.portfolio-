@@ -58,15 +58,26 @@ function request(body: unknown, init: { method?: string; origin?: string | null;
   })
 }
 
-async function run(body: unknown, opts: { meta?: ReturnType<typeof metaStub>; env?: Env; store?: ReturnType<typeof createStore>; logs?: string[] } & Parameters<typeof request>[1] = {}) {
+type Logger = { info: (m: string) => void; warn: (m: string) => void; error: (m: string) => void }
+
+type RunOptions = {
+  meta?: { calls: Call[]; fetchImpl: typeof fetch }
+  env?: Env
+  store?: ReturnType<typeof createStore>
+  logs?: string[]
+  log?: Logger
+  now?: number
+} & Parameters<typeof request>[1]
+
+async function run(body: unknown, opts: RunOptions = {}) {
   const meta = opts.meta ?? metaStub('sent')
   const logs = opts.logs ?? []
-  const log = { info: (m: string) => logs.push(m), warn: (m: string) => logs.push(m), error: (m: string) => logs.push(m) }
+  const log = opts.log ?? { info: (m: string) => logs.push(m), warn: (m: string) => logs.push(m), error: (m: string) => logs.push(m) }
   const res = await handleConsultation(request(body, opts), {
     env: opts.env ?? ENV,
     store: opts.store ?? createStore(),
     fetch: meta.fetchImpl,
-    now: () => NOW,
+    now: () => opts.now ?? NOW,
     log,
   })
   const text = await res.text()
@@ -215,4 +226,168 @@ test('responses carry no-store and JSON content type', async () => {
   const { res } = await run(valid)
   assert.equal(res.headers.get('cache-control'), 'no-store')
   assert.match(res.headers.get('content-type') ?? '', /application\/json/)
+})
+
+/* ── Validation allowlists ───────────────────────────────────────────────── */
+
+test('time accepts only the listed options, never inherited object properties', async () => {
+  for (const time of ['', 'morning', 'midday', 'afternoon', 'evening']) {
+    const { res } = await run({ ...valid, time, requestId: `req-time-${time || 'none'}`, message: `time ${time}` })
+    assert.equal(res.status, 200, `"${time}" should be accepted`)
+  }
+  for (const time of ['toString', 'constructor', 'hasOwnProperty', '__proto__', 'valueOf', 'Morning']) {
+    const { res, json, meta } = await run({ ...valid, time })
+    assert.equal(res.status, 422, `"${time}" should be rejected`)
+    assert.equal(json.error, 'invalid')
+    assert.equal(meta.calls.length, 0)
+  }
+})
+
+test('only the form fields are accepted, and text fields must be text', async () => {
+  const { message: _omitted, ...withoutMessage } = valid
+  const cases: Record<string, unknown> = {
+    'date as a number': { ...valid, date: 20261020 },
+    'time as null': { ...valid, time: null },
+    'message as an object': { ...valid, message: { text: 'hi' } },
+    'missing optional field': withoutMessage,
+    'unexpected extra field': { ...valid, admin: true },
+  }
+  for (const [label, body] of Object.entries(cases)) {
+    const { res, meta } = await run(body)
+    assert.equal(res.status, 422, label)
+    assert.equal(meta.calls.length, 0, label)
+  }
+  // A "__proto__" key written into the JSON text is an own key after parsing, so it is rejected too.
+  const raw = JSON.stringify(valid).replace(/^\{/, '{"__proto__":{"admin":true},')
+  assert.equal((await run(null, { raw })).res.status, 422)
+})
+
+test('a honeypot value that is not text counts as automated', async () => {
+  const { res, meta } = await run({ ...valid, website: 1 })
+  assert.equal(res.status, 400)
+  assert.equal(meta.calls.length, 0)
+})
+
+/* ── Duplicate and idempotency handling ──────────────────────────────────── */
+
+test('a request id reused with different details is a conflict, not a duplicate', async () => {
+  const store = createStore()
+  assert.equal((await run(valid, { store })).res.status, 200)
+  const reused = await run({ ...valid, message: 'Something else entirely.' }, { store })
+  assert.equal(reused.res.status, 409)
+  assert.equal(reused.json.error, 'conflict')
+  assert.equal(reused.meta.calls.length, 0)
+})
+
+test('concurrent copies of one request send once; later copies are duplicates', async () => {
+  const store = createStore()
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  const calls: Call[] = []
+  const slow = {
+    calls,
+    fetchImpl: (async (url: string, init: RequestInit) => {
+      calls.push({ url, init })
+      await gate
+      return Response.json({ messages: [{ id: 'wamid.TEST' }] })
+    }) as typeof fetch,
+  }
+
+  const first = run(valid, { store, meta: slow })
+  await new Promise((r) => setTimeout(r, 20)) // let the first request claim its keys
+  const second = await run(valid, { store, meta: slow })
+  assert.equal(second.res.status, 409)
+  assert.equal(second.json.error, 'in_progress')
+
+  release()
+  assert.equal((await first).res.status, 200)
+  assert.equal(calls.length, 1)
+  assert.equal(store.inFlight.size, 0)
+
+  const third = await run(valid, { store })
+  assert.equal(third.res.status, 200)
+  assert.equal(third.meta.calls.length, 0)
+})
+
+test('in-flight state is cleared after a failure, so the request can be retried', async () => {
+  const store = createStore()
+  assert.equal((await run(valid, { store, meta: metaStub('timeout') })).res.status, 502)
+  assert.equal(store.inFlight.size, 0)
+  assert.equal(store.sent.size, 0)
+  const retry = await run(valid, { store })
+  assert.equal(retry.res.status, 200)
+  assert.equal(retry.meta.calls.length, 1)
+})
+
+/* ── Unexpected errors ───────────────────────────────────────────────────── */
+
+test('an unexpected error returns a generic 500 without secrets, request content or stack', async () => {
+  const store = createStore()
+  const logs: string[] = []
+  const broken = {
+    calls: [] as Call[],
+    fetchImpl: (async () =>
+      ({
+        ok: true,
+        json() {
+          throw new Error(`boom ${valid.name} ${valid.email} ${SECRET}`)
+        },
+      }) as unknown as Response) as typeof fetch,
+  }
+  const { res, text } = await run(valid, { store, meta: broken, logs })
+  assert.equal(res.status, 500)
+  assert.deepEqual(JSON.parse(text), { ok: false, error: 'internal_error' })
+  const everything = text + '\n' + logs.join('\n')
+  for (const leaked of [SECRET, valid.name, valid.email, valid.phone, 'boom', 'at ']) assert.ok(!everything.includes(leaked), leaked)
+  assert.match(logs.join(), /unexpected error \(Error\)/)
+  assert.equal(store.inFlight.size, 0)
+})
+
+test('a failing logger never turns a sent request into a failure', async () => {
+  const store = createStore()
+  const down = () => {
+    throw new Error('logger down')
+  }
+  const { res, meta } = await run(valid, { store, log: { info: down, warn: down, error: down } })
+  assert.equal(res.status, 200)
+  assert.equal(meta.calls.length, 1)
+  // Recorded as sent, so a repeat is not sent again.
+  assert.equal((await run(valid, { store })).meta.calls.length, 0)
+})
+
+/* ── Memory limits (per instance, best effort) ───────────────────────────── */
+
+const MINUTE = 60_000
+
+test('when the rate-limit memory is full, only the least recently active addresses are dropped', async () => {
+  const store = createStore(3)
+  for (const ip of ['198.51.100.1', '198.51.100.2', '198.51.100.3', '198.51.100.4']) await run(null, { store, ip, raw: '{bad' })
+  assert.deepEqual([...store.hits.keys()], ['ip:198.51.100.2', 'ip:198.51.100.3', 'ip:198.51.100.4'])
+})
+
+test('an address at its limit stays limited while other addresses arrive', async () => {
+  const store = createStore(3)
+  for (let i = 0; i < 5; i++) await run(null, { store, ip: '198.51.100.9', raw: '{bad' })
+  await run(null, { store, ip: '198.51.100.10', raw: '{bad' })
+  await run(null, { store, ip: '198.51.100.11', raw: '{bad' })
+  assert.equal((await run(null, { store, ip: '198.51.100.9', raw: '{bad' })).res.status, 429)
+})
+
+test('expired entries are removed before any active entry is dropped', async () => {
+  const store = createStore(3)
+  await run(null, { store, ip: '198.51.100.20', raw: '{bad', now: NOW - 11 * MINUTE }) // expired by NOW
+  await run(null, { store, ip: '198.51.100.21', raw: '{bad', now: NOW - MINUTE })
+  await run(null, { store, ip: '198.51.100.22', raw: '{bad', now: NOW })
+  await run(null, { store, ip: '198.51.100.23', raw: '{bad', now: NOW })
+  assert.deepEqual([...store.hits.keys()], ['ip:198.51.100.21', 'ip:198.51.100.22', 'ip:198.51.100.23'])
+  assert.equal(store.hits.get('ip:198.51.100.21')?.length, 1)
+})
+
+test('sent-request memory keeps the most recent requests when full', async () => {
+  const store = createStore(2)
+  await run({ ...valid, requestId: 'req-old-0001', message: 'first' }, { store })
+  await run({ ...valid, requestId: 'req-new-0002', message: 'second' }, { store, ip: '203.0.113.2' })
+  assert.equal(store.sent.size, 2)
+  assert.ok(store.sent.has('id:req-new-0002'))
+  assert.ok(!store.sent.has('id:req-old-0001'))
 })

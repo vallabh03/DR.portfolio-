@@ -26,12 +26,21 @@ const TEMPLATE_PARAMS_BUDGET = 840
 
 const LIMITS = { name: 100, phone: 20, email: 254, message: 1000 } as const
 
-export const TIME_LABELS: Record<string, string> = {
+export const TIME_LABELS = {
   morning: 'Morning',
   midday: 'Midday',
   afternoon: 'Afternoon',
   evening: 'Evening',
-}
+} as const
+
+type TimeKey = keyof typeof TIME_LABELS
+
+/** Own keys only: inherited names such as "toString" or "__proto__" are never valid. */
+const isTimeKey = (value: string): value is TimeKey => Object.hasOwn(TIME_LABELS, value)
+
+/** The only keys the form sends. Anything else is rejected. */
+const ALLOWED_KEYS = new Set(['name', 'phone', 'email', 'date', 'time', 'message', 'consent', 'requestId', 'elapsedMs', 'website'])
+const TEXT_FIELDS = ['name', 'phone', 'email', 'date', 'time', 'message'] as const
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -42,7 +51,7 @@ export type Consultation = {
   /** YYYY-MM-DD or empty. */
   date: string
   /** A key of TIME_LABELS or empty. */
-  time: string
+  time: TimeKey | ''
   message: string
 }
 
@@ -61,14 +70,26 @@ export type Env = Partial<
 
 type Logger = Pick<Console, 'info' | 'warn' | 'error'>
 
-/** Per-instance memory for rate limiting and duplicate suppression. */
+/**
+ * Per-instance memory for rate limiting and duplicate suppression. It is lost
+ * when the instance stops and is not shared between instances, so it is a
+ * best-effort guard, not a durable one.
+ *
+ * Maps are kept in order of last activity (oldest first), so when a map is
+ * full the least recently used entries are dropped first.
+ */
 export type Store = {
+  /** Request times per client address. */
   hits: Map<string, number[]>
-  sent: Map<string, number>
+  /** Sent requests, by request id and by content fingerprint. */
+  sent: Map<string, { at: number; fingerprint: string }>
+  /** Request ids and fingerprints currently being sent. */
   inFlight: Set<string>
+  /** Upper bound on entries in `hits` and in `sent`. */
+  maxKeys: number
 }
 
-export const createStore = (): Store => ({ hits: new Map(), sent: new Map(), inFlight: new Set() })
+export const createStore = (maxKeys = 5000): Store => ({ hits: new Map(), sent: new Map(), inFlight: new Set(), maxKeys })
 
 export type Options = {
   env: Env
@@ -130,33 +151,37 @@ type Parsed =
 export function parseSubmission(body: unknown, now: number): Parsed {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { kind: 'invalid', fields: ['body'] }
   const b = body as Record<string, unknown>
-  const str = (k: string) => (typeof b[k] === 'string' ? clean(b[k] as string) : '')
 
-  // Spam signals: the hidden field is filled in, or the form was completed implausibly fast.
-  if (str('website').trim() !== '') return { kind: 'bot' }
+  // Spam signals: the hidden field is filled in (or is not text), or the form was completed implausibly fast.
+  if (Object.hasOwn(b, 'website') && (typeof b.website !== 'string' || clean(b.website).trim() !== '')) return { kind: 'bot' }
   if (typeof b.elapsedMs !== 'number' || !Number.isFinite(b.elapsedMs) || b.elapsedMs < MIN_FILL_MS) return { kind: 'bot' }
 
-  const data: Consultation = {
-    name: oneLine(str('name')),
-    phone: oneLine(str('phone')),
-    email: oneLine(str('email')),
-    date: str('date').trim(),
-    time: str('time').trim(),
-    message: str('message').trim(),
-  }
+  const bad: string[] = []
+  // Only the keys the form sends, and every text field must actually be text ('' when left empty).
+  if (Object.keys(b).some((k) => !ALLOWED_KEYS.has(k))) bad.push('body')
+  for (const k of TEXT_FIELDS) if (typeof b[k] !== 'string') bad.push(k)
+  if (bad.length) return { kind: 'invalid', fields: bad }
+
+  const str = (k: (typeof TEXT_FIELDS)[number]) => clean(b[k] as string)
+  const name = oneLine(str('name'))
+  const phone = oneLine(str('phone'))
+  const email = oneLine(str('email'))
+  const date = str('date').trim()
+  const time = str('time').trim()
+  const message = str('message').trim()
   const requestId = typeof b.requestId === 'string' ? b.requestId : ''
 
-  const bad: string[] = []
-  if (data.name.length < 2 || data.name.length > LIMITS.name) bad.push('name')
-  if (!PHONE_RE.test(data.phone) || data.phone.replace(/\D/g, '').length < 7) bad.push('phone')
-  if (data.email.length > LIMITS.email || !EMAIL_RE.test(data.email)) bad.push('email')
-  if (data.date && !validDate(data.date, now)) bad.push('date')
-  if (data.time && !(data.time in TIME_LABELS)) bad.push('time')
-  if (data.message.length > LIMITS.message) bad.push('message')
+  if (name.length < 2 || name.length > LIMITS.name) bad.push('name')
+  if (phone.length > LIMITS.phone || !PHONE_RE.test(phone) || phone.replace(/\D/g, '').length < 7) bad.push('phone')
+  if (email.length > LIMITS.email || !EMAIL_RE.test(email)) bad.push('email')
+  if (date && !validDate(date, now)) bad.push('date')
+  if (time && !isTimeKey(time)) bad.push('time')
+  if (message.length > LIMITS.message) bad.push('message')
   if (b.consent !== true) bad.push('consent')
   if (!REQUEST_ID_RE.test(requestId)) bad.push('requestId')
+  if (bad.length) return { kind: 'invalid', fields: bad }
 
-  return bad.length ? { kind: 'invalid', fields: bad } : { kind: 'ok', data, requestId }
+  return { kind: 'ok', data: { name, phone, email, date, time: time as TimeKey | '', message }, requestId }
 }
 
 /* ── The WhatsApp message ────────────────────────────────────────────────── */
@@ -241,25 +266,42 @@ async function sendWhatsApp(c: Consultation, env: Required<Pick<Env, RequiredKey
 
 /* ── Abuse controls (per instance) ───────────────────────────────────────── */
 
+/** Drops the least recently used entries (the front of the map) until it fits. */
+function trimOldest(map: Map<string, unknown>, max: number) {
+  for (const key of map.keys()) {
+    if (map.size <= max) break
+    map.delete(key)
+  }
+}
+
 function rateLimited(store: Store, key: string, now: number) {
   const recent = (store.hits.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
+  // Re-insert so the map stays ordered by last activity.
+  store.hits.delete(key)
   store.hits.set(key, recent)
+  trimOldest(store.hits, store.maxKeys)
   return recent.length > RATE_LIMIT_MAX
 }
 
-function prune(store: Store, now: number) {
+/** Removes expired entries. The size cap is applied after this, so expired entries always go first. */
+function pruneExpired(store: Store, now: number) {
   for (const [k, times] of store.hits) if (times.every((t) => now - t >= RATE_LIMIT_WINDOW_MS)) store.hits.delete(k)
-  for (const [k, t] of store.sent) if (now - t >= DUPLICATE_WINDOW_MS) store.sent.delete(k)
-  // Hard caps so memory cannot grow without bound under a flood.
-  if (store.hits.size > 5000) store.hits.clear()
-  if (store.sent.size > 5000) store.sent.clear()
+  for (const [k, v] of store.sent) if (now - v.at >= DUPLICATE_WINDOW_MS) store.sent.delete(k)
 }
 
-async function fingerprint(c: Consultation) {
+function recordSent(store: Store, keys: string[], fingerprint: string, now: number) {
+  for (const k of keys) {
+    store.sent.delete(k)
+    store.sent.set(k, { at: now, fingerprint })
+  }
+  trimOldest(store.sent, store.maxKeys)
+}
+
+async function contentFingerprint(c: Consultation) {
   const text = [c.phone.replace(/\D/g, ''), c.email.toLowerCase(), c.date, c.time, oneLine(c.message)].join('|')
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-  return 'fp:' + Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 function clientIp(request: Request, fallback?: string) {
@@ -289,10 +331,32 @@ type RequiredKey = (typeof REQUIRED)[number]
 /* ── Handler ─────────────────────────────────────────────────────────────── */
 
 export async function handleConsultation(request: Request, opts: Options): Promise<Response> {
+  const log = safeLogger(opts.log ?? console)
+  try {
+    return await handle(request, opts, log)
+  } catch (err) {
+    // Unexpected failure: log the error's name only. Its message or stack could contain request content.
+    log.error(`consultation: unexpected error (${err instanceof Error ? err.name : typeof err})`)
+    return fail(500, 'internal_error')
+  }
+}
+
+/** Logging can never turn a handled request into a failure. */
+function safeLogger(log: Logger): Logger {
+  const wrap = (fn: (message: string) => void) => (message: string) => {
+    try {
+      fn.call(log, message)
+    } catch {
+      /* a broken logger must not affect the response */
+    }
+  }
+  return { info: wrap(log.info), warn: wrap(log.warn), error: wrap(log.error) }
+}
+
+async function handle(request: Request, opts: Options, log: Logger): Promise<Response> {
   const { env } = opts
   const store = opts.store ?? defaultStore
   const now = (opts.now ?? Date.now)()
-  const log = opts.log ?? console
 
   if (request.method !== 'POST') return fail(405, 'method_not_allowed', { Allow: 'POST' })
   if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return fail(415, 'unsupported_media_type')
@@ -303,7 +367,7 @@ export async function handleConsultation(request: Request, opts: Options): Promi
   const raw = await request.text()
   if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return fail(413, 'too_large')
 
-  prune(store, now)
+  pruneExpired(store, now)
   if (rateLimited(store, `ip:${clientIp(request, opts.clientIp)}`, now)) {
     log.warn('consultation: rate limit reached')
     return fail(429, 'rate_limited', { 'Retry-After': String(RATE_LIMIT_WINDOW_MS / 1000) })
@@ -332,26 +396,37 @@ export async function handleConsultation(request: Request, opts: Options): Promi
     return fail(503, 'unavailable')
   }
 
-  // A retry of a request that already went through, or the same details sent twice.
   const idKey = `id:${parsed.requestId}`
-  const fpKey = await fingerprint(parsed.data)
-  if (store.sent.has(idKey) || store.sent.has(fpKey)) {
+  const fingerprint = await contentFingerprint(parsed.data)
+  const fpKey = `fp:${fingerprint}`
+
+  // No await between these checks and claiming the keys, so two concurrent requests cannot both pass.
+  const previous = store.sent.get(idKey)
+  if (previous && previous.fingerprint !== fingerprint) {
+    // The same request id with different details is never treated as the earlier request.
+    log.warn('consultation: request id reused with different details')
+    return fail(409, 'conflict')
+  }
+  if (previous || store.sent.has(fpKey)) {
+    // A retry of a request that already went through, or the same details sent again.
     log.info('consultation: duplicate suppressed')
     return reply(200, { ok: true })
   }
   if (store.inFlight.has(idKey) || store.inFlight.has(fpKey)) return fail(409, 'in_progress')
 
   store.inFlight.add(idKey).add(fpKey)
+  let result: SendResult
   try {
-    const result = await sendWhatsApp(parsed.data, env as Required<Pick<Env, RequiredKey>> & Env, opts.fetch ?? fetch, log)
-    if (!result.ok) return fail(502, 'delivery_failed')
-    store.sent.set(idKey, now).set(fpKey, now)
-    log.info('consultation: WhatsApp notification accepted by Meta')
-    return reply(200, { ok: true })
+    result = await sendWhatsApp(parsed.data, env as Required<Pick<Env, RequiredKey>> & Env, opts.fetch ?? fetch, log)
   } finally {
     store.inFlight.delete(idKey)
     store.inFlight.delete(fpKey)
   }
+  // Failures are not recorded, so the same request can be retried.
+  if (!result.ok) return fail(502, 'delivery_failed')
+  recordSent(store, [idKey, fpKey], fingerprint, now)
+  log.info('consultation: WhatsApp notification accepted by Meta')
+  return reply(200, { ok: true })
 }
 
 /** Vercel entry point. Other common methods get a 405 from the handler. */
