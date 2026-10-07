@@ -11,8 +11,10 @@ import Button, { ArrowRight } from '../components/Button'
  * Consultation: an intake document. Three numbered parts with a label column,
  * an error summary when a part needs attention, a review of the details before
  * sending, and a formal record of the request once it is received. Margin notes
- * say what happens next. Sending uses doctor.booking.endpoint when one is set;
- * without one the request is acknowledged locally and nothing is sent.
+ * say what happens next. The request is sent to the site's own endpoint
+ * (doctor.booking.endpoint), which notifies the practice on WhatsApp. The record
+ * is shown only after the endpoint confirms the request was sent; on failure the
+ * entered details stay in place so the visitor can try again.
  */
 
 type Values = {
@@ -66,7 +68,7 @@ const today = () => {
 function validate(v: Values): Errors {
   const e: Errors = {}
   if (v.name.trim().length < 2) e.name = 'Please enter your full name.'
-  if (!/^[+()\d\s-]{7,20}$/.test(v.phone.trim())) e.phone = 'Please enter a valid phone number.'
+  if (!/^[+()\d\s-]{7,20}$/.test(v.phone.trim()) || v.phone.replace(/\D/g, '').length < 7) e.phone = 'Please enter a valid phone number.'
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email.trim())) e.email = 'Please enter a valid email address.'
   if (v.date && v.date < today()) e.date = 'Please choose a date from today onwards.'
   if (v.message.length > 1000) e.message = 'Please keep your message under 1000 characters.'
@@ -184,6 +186,25 @@ function MarginNotes() {
 
 /* ── 4. The intake document ──────────────────────────────────────────────── */
 
+/** A random id per request, reused on retries so the server can ignore a repeat of one already sent. */
+const newRequestId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+
+type SendError = 'failed' | 'rate_limited'
+
+async function sendRequest(values: Values, extra: { requestId: string; elapsedMs: number; website: string }) {
+  if (!doctor.booking.endpoint) throw new Error('No endpoint configured')
+  const res = await fetch(doctor.booking.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ ...values, ...extra }),
+  })
+  if (res.status === 429) throw new Error('rate_limited')
+  // Success only when the endpoint itself says the request was sent.
+  const data = (await res.json().catch(() => null)) as { ok?: unknown } | null
+  if (!res.ok || data?.ok !== true) throw new Error('failed')
+}
+
 function IntakeDocument() {
   const animated = useDecorativeMotion()
   const [values, setValues] = useState<Values>(EMPTY)
@@ -192,11 +213,16 @@ function IntakeDocument() {
   const [step, setStep] = useState(0)
   const [direction, setDirection] = useState(1)
   const [status, setStatus] = useState<'idle' | 'sending' | 'received' | 'error'>('idle')
+  const [sendError, setSendError] = useState<SendError>('failed')
   const [record, setRecord] = useState<Values | null>(null)
   const docRef = useRef<HTMLDivElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Which field should receive focus when the next part mounts ('' = its first field).
   const focusRequest = useRef<Field | '' | null>(null)
+  // Spam signals for the server: when the form was opened, and a field only automated clients fill in.
+  const startedAt = useRef(Date.now())
+  const honeypot = useRef<HTMLInputElement>(null)
+  const requestId = useRef<string | null>(null)
 
   // Clearing works from the latest errors, so the summary empties itself as each field is fixed.
   const set = <K extends Field>(k: K, val: Values[K]) => {
@@ -239,24 +265,22 @@ function IntakeDocument() {
     }
 
     setStatus('sending')
+    requestId.current ??= newRequestId()
     try {
-      if (doctor.booking.endpoint) {
-        const res = await fetch(doctor.booking.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(values),
-        })
-        if (!res.ok) throw new Error(String(res.status))
-      } else {
-        // No backend configured yet: acknowledge locally without sending data.
-        await new Promise((r) => setTimeout(r, 900))
-      }
+      await sendRequest(values, {
+        requestId: requestId.current,
+        elapsedMs: Date.now() - startedAt.current,
+        website: honeypot.current?.value ?? '',
+      })
+      requestId.current = null
       setRecord(values)
       setStatus('received')
       setValues(EMPTY)
       setStep(0)
       requestAnimationFrame(revealDocument)
-    } catch {
+    } catch (err) {
+      // The entered details are kept so the visitor can try again.
+      setSendError(err instanceof Error && err.message === 'rate_limited' ? 'rate_limited' : 'failed')
       setStatus('error')
     }
   }
@@ -264,6 +288,7 @@ function IntakeDocument() {
   const reset = () => {
     setStatus('idle')
     setRecord(null)
+    startedAt.current = Date.now()
     focusRequest.current = ''
   }
 
@@ -303,6 +328,13 @@ function IntakeDocument() {
             <h2 id="request-title" className="sr-only">
               Consultation request
             </h2>
+            {/* Left empty by people; hidden from view, keyboard and screen readers */}
+            <div aria-hidden className="absolute -left-[9999px] h-px w-px overflow-hidden">
+              <label>
+                Website
+                <input ref={honeypot} type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
+              </label>
+            </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <Progress step={step} />
               <p className="text-sm text-muted sm:pt-2">
@@ -322,13 +354,13 @@ function IntakeDocument() {
                   {step === 0 && (
                     <div className="mt-6">
                       <Row field="name" required error={errors.name} index={0}>
-                        {(p) => <input {...p} type="text" autoComplete="name" value={values.name} onChange={(e) => set('name', e.target.value)} />}
+                        {(p) => <input {...p} type="text" autoComplete="name" maxLength={100} value={values.name} onChange={(e) => set('name', e.target.value)} />}
                       </Row>
                       <Row field="phone" required error={errors.phone} index={1}>
                         {(p) => <input {...p} type="tel" inputMode="tel" autoComplete="tel" value={values.phone} onChange={(e) => set('phone', e.target.value)} />}
                       </Row>
                       <Row field="email" required error={errors.email} index={2}>
-                        {(p) => <input {...p} type="email" autoComplete="email" value={values.email} onChange={(e) => set('email', e.target.value)} />}
+                        {(p) => <input {...p} type="email" autoComplete="email" maxLength={254} value={values.email} onChange={(e) => set('email', e.target.value)} />}
                       </Row>
                     </div>
                   )}
@@ -377,7 +409,9 @@ function IntakeDocument() {
             </div>
             {status === 'error' && (
               <p role="alert" className="mt-4 text-sm text-danger">
-                Something went wrong. Please try again, or contact the practice directly.
+                {sendError === 'rate_limited'
+                  ? 'Your request has not been sent because several requests came from this connection in a short time. Please wait a few minutes and try again, or contact the practice directly.'
+                  : 'Your request has not been sent. Your details are still here, so please try again, or contact the practice directly.'}
               </p>
             )}
           </motion.form>
@@ -676,11 +710,6 @@ function RequestRecord({ record, onReset }: { record: Values; onReset: () => voi
         ))}
       </dl>
 
-      {import.meta.env.DEV && !doctor.booking.endpoint && (
-        <p className="mt-6 text-sm text-muted">
-          Development note: no form endpoint is configured in <code>src/data/doctor.ts</code>, so nothing was sent.
-        </p>
-      )}
       <div className="mt-10">
         <Button variant="secondary" onClick={onReset}>
           Send another request

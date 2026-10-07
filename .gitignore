@@ -3,3 +3,11 @@ dist
 *.local
 *.tsbuildinfo
 __pycache__/
+
+# Environment files hold secrets; only the example is committed
+.env
+.env.*
+!.env.example
+
+# Vercel CLI
+.vercel

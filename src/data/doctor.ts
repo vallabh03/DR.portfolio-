@@ -262,10 +262,11 @@ export const doctor = {
 
   booking: {
     /**
-     * Optional form endpoint (e.g. Formspree, a clinic CRM webhook). When empty,
-     * the form validates and shows the acknowledgement without sending data.
+     * The site's own consultation endpoint (api/consultation.ts), which sends the
+     * request to the practice on WhatsApp. Credentials live only in server
+     * environment variables, never here. See docs/SETUP.md.
      */
-    endpoint: '',
+    endpoint: '/api/consultation',
   },
 
   seo: {
