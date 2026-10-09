@@ -136,7 +136,7 @@ function Atlas({ active }: { active: number }) {
           )}
           <div className={hasPlates ? 'lg:col-span-7' : 'lg:col-span-8'}>
             {areas.map((item, i) => (
-              <Entry key={i} index={i} isActive={active === i} title={item.title} description={item.description} details={item.details} image={item.image} />
+              <Entry key={i} index={i} isActive={active === i} title={item.title} description={item.description} details={item.details} detailsLabel={item.detailsLabel} image={item.image} />
             ))}
           </div>
         </div>
@@ -230,6 +230,7 @@ function Entry({
   title,
   description,
   details,
+  detailsLabel,
   image,
 }: {
   index: number
@@ -237,6 +238,7 @@ function Entry({
   title: string
   description: string
   details?: string[]
+  detailsLabel?: string
   image?: string
 }) {
   const animated = useDecorativeMotion()
@@ -286,7 +288,7 @@ function Entry({
 
       {conditions.length > 0 && (
         <>
-          <h3 className="label mt-10">Conditions and procedures</h3>
+          <h3 className="label mt-10">{hasValue(detailsLabel) ? detailsLabel : 'Conditions and procedures'}</h3>
           <ul className="measure mt-3 border-t border-line">
             {conditions.map((d, j) => (
               <li key={j} className="border-b border-line py-3">
