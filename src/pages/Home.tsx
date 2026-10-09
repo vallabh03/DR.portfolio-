@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { Link } from 'react-router'
-import { doctor, isPlaceholder } from '../data/doctor'
+import { doctor, hasValue, publishable, shortName } from '../data/doctor'
 import { BOOK_PATH, showTestimonials } from '../data/navigation'
 import { useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
@@ -26,7 +26,7 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <ApproachSpread />
+      {(approachQuote || approachStages.length > 0) && <ApproachSpread />}
       <FocusIndex />
       <RecordSpread />
       {showTestimonials && <Testimonials />}
@@ -38,11 +38,13 @@ export default function Home() {
 /* ── 1. Hero: masthead name, portrait in an arch, and the practice at a glance ── */
 function Hero() {
   const entrance = useEntrance()
+  // Only facts with a confirmed value are shown; the grid adapts to how many there are.
   const facts = [
-    { k: 'Specialty', v: doctor.title },
+    { k: 'Specialty', v: doctor.specialty },
     { k: 'Practice', v: doctor.contact.clinic, link: { to: '/contact', label: 'Directions and hours' } },
-    { k: 'Languages', v: doctor.about.languages.join(', ') },
-  ]
+    { k: 'Languages', v: publishable(doctor.about.languages).join(', ') },
+  ].filter((f): f is typeof f & { v: string } => hasValue(f.v))
+  const factCols = ['', 'sm:grid-cols-1', 'sm:grid-cols-2', 'sm:grid-cols-3'][facts.length]
 
   return (
     <section aria-labelledby="home-title" className="relative isolate">
@@ -54,21 +56,22 @@ function Hero() {
 
             {/* Supporting copy settles as one group once the name has landed */}
             <motion.div {...entrance(0.7)}>
-              <p className={`mt-6 text-lg ${isPlaceholder(doctor.title) ? 'text-muted' : 'text-fg'}`}>{doctor.title}</p>
-              <span aria-hidden className="mt-8 block h-px w-24 bg-accent" />
-              <p className="mt-8 max-w-xl font-serif text-[clamp(1.375rem,1.15rem+1vw,2rem)] leading-[1.3] tracking-[-0.01em] text-fg/85">
-                {doctor.statement.map((s, i) => (
-                  <span key={i} className="block">
-                    {s}
-                  </span>
-                ))}
-              </p>
+              {hasValue(doctor.title) && <p className="mt-6 text-lg text-fg">{doctor.title}</p>}
+              {hasValue(doctor.headline) && (
+                <>
+                  <span aria-hidden className="mt-8 block h-px w-24 bg-accent" />
+                  <p className="mt-8 max-w-xl font-serif text-[clamp(1.375rem,1.15rem+1vw,2rem)] leading-[1.3] tracking-[-0.01em] text-fg/85">
+                    {doctor.headline}
+                  </p>
+                  {hasValue(doctor.headlineSupport) && <p className="measure mt-4 text-fg/85">{doctor.headlineSupport}</p>}
+                </>
+              )}
               <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Button to={BOOK_PATH}>
                   Book a consultation <ArrowRight />
                 </Button>
                 <Button to="/about" variant="secondary">
-                  About Dr. Thaduri
+                  About {shortName}
                 </Button>
               </div>
             </motion.div>
@@ -92,7 +95,7 @@ function Hero() {
               {/* Editorial caption, as a publication would credit a portrait */}
               <figcaption className="mt-5 flex items-baseline justify-between gap-4 text-sm text-muted">
                 <span>{doctor.name}</span>
-                <span className={`text-right ${isPlaceholder(doctor.contact.clinic) ? '' : 'text-fg/80'}`}>{doctor.contact.clinic}</span>
+                {hasValue(doctor.contact.clinic) && <span className="text-right text-fg/80">{doctor.contact.clinic}</span>}
               </figcaption>
             </figure>
           </div>
@@ -100,59 +103,65 @@ function Hero() {
 
         {/* At a glance */}
         <div className="mt-16 md:mt-20">
-          <p className="measure text-muted">A digital portfolio of clinical practice: experience, credentials and approach to care.</p>
-          <div className="relative mt-6">
-            <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.2} />
-            <dl className="grid sm:grid-cols-3">
-              {facts.map((f, i) => (
-                <div key={f.k} className={`py-5 sm:py-7 ${i > 0 ? 'border-t border-line sm:border-l sm:border-t-0 sm:pl-6' : ''}`}>
-                  <dt className="label">{f.k}</dt>
-                  <dd className="mt-2">
-                    <span className={isPlaceholder(f.v) ? 'text-muted' : ''}>{f.v}</span>
-                    {f.link && (
-                      <Link to={f.link.to} className="group/btn mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-accent hover:text-accent-hover">
-                        <span className="link-underline">{f.link.label}</span>
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.2} delay={0.15} />
-          </div>
+          {/* The doctor's short biography, shown only once supplied */}
+          {hasValue(doctor.bioShort) && <p className="measure text-fg/85">{doctor.bioShort}</p>}
+          {facts.length > 0 && (
+            <div className={`relative ${hasValue(doctor.bioShort) ? 'mt-6' : ''}`}>
+              <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.2} />
+              <dl className={`grid ${factCols}`}>
+                {facts.map((f, i) => (
+                  <div key={f.k} className={`py-5 sm:py-7 ${i > 0 ? 'border-t border-line sm:border-l sm:border-t-0 sm:pl-6' : ''}`}>
+                    <dt className="label">{f.k}</dt>
+                    <dd className="mt-2">
+                      <span>{f.v}</span>
+                      {f.link && (
+                        <Link to={f.link.to} className="group/btn mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-accent hover:text-accent-hover">
+                          <span className="link-underline">{f.link.label}</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.2} delay={0.15} />
+            </div>
+          )}
         </div>
       </div>
     </section>
   )
 }
 
-/* ── 2. Approach: the philosophy as a pull quote, and the five stages as a drawn sequence ── */
+/* ── 2. Approach: the philosophy as a pull quote, and the consultation stages as a drawn sequence ── */
+
+// The doctor's approach statement when supplied, otherwise the philosophy text. Each part is hidden when absent,
+// and the whole section when both are.
+const approachQuote = [doctor.approachStatement, doctor.about.philosophy].find(hasValue)
+const approachStages = doctor.approach.filter((s) => hasValue(s.title))
+
 function ApproachSpread() {
-  const { philosophy } = doctor.about
-  const stages = doctor.approach
+  const quote = approachQuote
+  const stages = approachStages
 
   return (
     <section aria-labelledby="approach-title" className="border-y border-line bg-surface">
       <div className="container-page section-y">
         <div className="grid gap-10 lg:grid-cols-12">
           <RevealText as="h2" id="approach-title" lines={['Approach to care']} className="heading-2 lg:col-span-4" />
-          <figure className="lg:col-span-8">
-            <blockquote
-              className={`font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.5rem)] leading-[1.3] tracking-[-0.01em] ${
-                isPlaceholder(philosophy) ? 'text-muted' : ''
-              }`}
-            >
-              {philosophy}
-            </blockquote>
-            <figcaption className="mt-6 flex items-center gap-4 text-sm text-muted">
-              <DrawLine className="w-10 bg-brass" duration={0.7} />
-              Clinical philosophy, {doctor.name}
-            </figcaption>
-          </figure>
+          {quote && (
+            <figure className="lg:col-span-8">
+              <blockquote className="font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.5rem)] leading-[1.3] tracking-[-0.01em]">{quote}</blockquote>
+              <figcaption className="mt-6 flex items-center gap-4 text-sm text-muted">
+                <DrawLine className="w-10 bg-brass" duration={0.7} />
+                Clinical philosophy, {doctor.name}
+              </figcaption>
+            </figure>
+          )}
         </div>
 
-        {/* The consultation sequence: a teal line draws through the five stages */}
+        {/* The consultation sequence: a teal line draws through the stages */}
+        {stages.length > 0 && (
         <div className="mt-16 md:mt-24">
           <h3 className="sr-only">How a consultation unfolds</h3>
           <ol className="relative grid gap-0 lg:grid-cols-5 lg:gap-6">
@@ -187,6 +196,7 @@ function ApproachSpread() {
             <ArrowRight />
           </Link>
         </div>
+        )}
       </div>
     </section>
   )
@@ -194,14 +204,14 @@ function ApproachSpread() {
 
 /* ── 3. Areas of clinical focus: an editorial two-column index ── */
 function FocusIndex() {
-  const items = doctor.expertise
+  const items = doctor.expertise.filter((e) => hasValue(e.title))
+  if (items.length === 0) return null
 
   return (
     <section aria-labelledby="focus-title" className="container-page section-y">
       <div className="grid gap-10 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <RevealText as="h2" id="focus-title" lines={['Areas of', 'clinical focus']} className="heading-2" />
-          <p className="measure mt-6 text-muted">Only verified specialties are listed. Each area links to the conditions and procedures it covers.</p>
         </div>
 
         <ol className="grid gap-x-10 sm:grid-cols-2 lg:col-span-8">
@@ -212,14 +222,10 @@ function FocusIndex() {
                 <span aria-hidden className="font-serif tabular-nums text-brass">
                   {pad(i + 1)}
                 </span>
-                <h3
-                  className={`heading-3 mt-3 transition-[transform,color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1.5 group-hover:text-accent ${
-                    isPlaceholder(item.title) ? 'text-fg/75' : ''
-                  }`}
-                >
+                <h3 className="heading-3 mt-3 transition-[transform,color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1.5 group-hover:text-accent">
                   {item.title}
                 </h3>
-                <p className={`mt-3 ${isPlaceholder(item.description) ? 'text-muted' : 'text-fg/85'}`}>{item.description}</p>
+                {hasValue(item.description) && <p className="mt-3 text-fg/85">{item.description}</p>}
               </Link>
             </li>
           ))}
@@ -237,13 +243,16 @@ function FocusIndex() {
 
 /* ── 4. Record: recent roles as a short timeline, beside research interests ── */
 function RecordSpread() {
-  const roles = doctor.experience.slice(0, 3)
+  const roles = doctor.experience.filter((r) => hasValue(r.role)).slice(0, 3)
+  const interests = publishable(doctor.researchInterests)
+  if (roles.length === 0 && interests.length === 0) return null
 
   return (
     <section aria-label="Experience and research" className="border-t border-line">
       <div className="container-page section-y">
         <div className="grid gap-16 lg:grid-cols-12 lg:gap-10">
           {/* Experience */}
+          {roles.length > 0 && (
           <div className="lg:col-span-7">
             <RevealText as="h2" lines={['Track record']} className="heading-2" />
             <ol className="relative mt-10 border-l border-line pl-7 sm:pl-10">
@@ -251,12 +260,9 @@ function RecordSpread() {
               {roles.map((r, i) => (
                 <li key={i} className="relative pb-9 last:pb-0">
                   <span aria-hidden className="absolute -left-[calc(1.75rem+5px)] top-2 h-[9px] w-[9px] rounded-full border border-accent bg-bg sm:-left-[calc(2.5rem+5px)]" />
-                  <p className="font-serif tabular-nums text-brass">{r.year}</p>
-                  <h3 className={`heading-3 mt-1 ${isPlaceholder(r.role) ? 'text-fg/75' : ''}`}>{r.role}</h3>
-                  <p className="mt-1 text-muted">
-                    {r.institution}
-                    {r.location ? `, ${r.location}` : ''}
-                  </p>
+                  {hasValue(r.year) && <p className="font-serif tabular-nums text-brass">{r.year}</p>}
+                  <h3 className="heading-3 mt-1">{r.role}</h3>
+                  {[r.institution, r.location].some(hasValue) && <p className="mt-1 text-muted">{[r.institution, r.location].filter(hasValue).join(', ')}</p>}
                 </li>
               ))}
             </ol>
@@ -265,19 +271,21 @@ function RecordSpread() {
               <ArrowRight />
             </Link>
           </div>
+          )}
 
           {/* Research */}
-          <div className="lg:col-span-4 lg:col-start-9">
+          {interests.length > 0 && (
+          <div className={roles.length > 0 ? 'lg:col-span-4 lg:col-start-9' : 'lg:col-span-7'}>
             <RevealText as="h2" lines={['Research interests']} className="heading-2" />
             <ul className="mt-10">
-              {doctor.researchInterests.map((r, i) => (
-                <li key={i} className={`relative py-4 ${isPlaceholder(r) ? 'text-muted' : ''}`}>
+              {interests.map((r, i) => (
+                <li key={i} className="relative py-4">
                   <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={i * 0.08} />
                   {r}
                 </li>
               ))}
               <li aria-hidden className="relative">
-                <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={doctor.researchInterests.length * 0.08} />
+                <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={interests.length * 0.08} />
               </li>
             </ul>
             <Link to="/research" className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
@@ -285,6 +293,7 @@ function RecordSpread() {
               <ArrowRight />
             </Link>
           </div>
+          )}
         </div>
       </div>
     </section>

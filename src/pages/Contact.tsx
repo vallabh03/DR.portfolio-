@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from 'react'
 import { motion, useInView } from 'motion/react'
-import { doctor, isPlaceholder } from '../data/doctor'
+import { doctor, hasValue } from '../data/doctor'
 import { BOOK_PATH } from '../data/navigation'
 import { EASE, EASE_IN_OUT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
@@ -13,13 +13,31 @@ import BookingPrompt from '../components/BookingPrompt'
  * Contact: a letterhead and a directory. The practice address is set large,
  * line by line, beside the clinic photograph mounted in a drawn frame; the ways
  * to get in touch follow as ruled rows, then working hours and the urgent note.
+ * Anything not yet confirmed is left out rather than shown as a placeholder.
  */
+
+const { contact } = doctor
+/** The address, in reading order, with missing lines left out. */
+const addressLines = [contact.clinic, contact.addressLine, contact.locality, contact.postcode].filter(hasValue)
+const hours = contact.hours.filter((h) => hasValue(h.days) && hasValue(h.time))
+
+type Row = { label: string; value: ReactNode; href?: string; external?: boolean; serif?: boolean }
+
+/** Ways to get in touch that have a confirmed value. */
+const contactRows: Row[] = [
+  ...(hasValue(contact.phone) ? [{ label: 'Telephone', value: contact.phone, href: `tel:${contact.phone.replace(/\s+/g, '')}` }] : []),
+  ...(hasValue(contact.email) ? [{ label: 'Email', value: contact.email, href: `mailto:${contact.email}` }] : []),
+  ...contact.links
+    .filter((l) => hasValue(l.label) && hasValue(l.href))
+    .map((l, i) => ({ label: i === 0 ? 'Professional profiles' : '', value: l.label, href: l.href, external: true, serif: true })),
+]
+
 export default function Contact() {
   return (
     <>
       <Opening />
-      <Letterhead />
-      <Directory />
+      {addressLines.length > 0 && <Letterhead />}
+      {(contactRows.length > 0 || hours.length > 0) && <Directory />}
       <UrgentNote />
       <BookingPrompt />
     </>
@@ -30,7 +48,7 @@ export default function Contact() {
 
 function Opening() {
   const entrance = useEntrance()
-  const { mapUrl } = doctor.contact
+  const { mapUrl } = contact
 
   return (
     <section aria-labelledby="contact-title" className="container-page pt-10 md:pt-16 lg:pt-24">
@@ -42,7 +60,7 @@ function Opening() {
             <Button to={BOOK_PATH}>
               Book a consultation <ArrowRight />
             </Button>
-            {mapUrl && (
+            {hasValue(mapUrl) && (
               <Button href={mapUrl} variant="secondary" external>
                 Get directions
                 <span className="sr-only"> (opens in a new tab)</span>
@@ -114,9 +132,6 @@ function FramedPhotograph() {
 }
 
 function Letterhead() {
-  const { clinic, address, city } = doctor.contact
-  const muted = [clinic, address, city].every(isPlaceholder)
-
   return (
     <section aria-labelledby="address-title" className="container-page py-12 md:py-16 lg:py-20">
       <h2 id="address-title" className="sr-only">
@@ -124,11 +139,11 @@ function Letterhead() {
       </h2>
       <div className="grid gap-10 lg:grid-cols-12 lg:items-center lg:gap-10">
         <div className="lg:col-span-7">
-          {/* The address reads in order: clinic, street, city */}
+          {/* The address reads in order: clinic, street, locality, postcode */}
           <RevealText
             as="address"
-            lines={[clinic, address, city]}
-            className={`not-italic font-serif text-[clamp(2rem,1.4rem+2.6vw,3.75rem)] leading-[1.12] tracking-[-0.015em] ${muted ? 'text-fg/75' : ''}`}
+            lines={addressLines}
+            className="not-italic font-serif text-[clamp(2rem,1.4rem+2.6vw,3.75rem)] leading-[1.12] tracking-[-0.015em]"
             delay={0.1}
           />
         </div>
@@ -142,8 +157,6 @@ function Letterhead() {
 
 /* ── 3. Directory: contact methods as ruled rows, beside working hours ───── */
 
-type Row = { label: string; value: ReactNode; href?: string; external?: boolean; muted?: boolean; serif?: boolean }
-
 function DirectoryRow({ row, first }: { row: Row; first?: boolean }) {
   const inner = (
     <>
@@ -151,7 +164,7 @@ function DirectoryRow({ row, first }: { row: Row; first?: boolean }) {
       <span
         className={`min-w-0 break-words transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           row.href ? 'group-hover:translate-x-1 group-focus-visible:translate-x-1' : ''
-        } ${row.serif ? 'font-serif text-[1.375rem] leading-snug' : 'text-xl tabular-nums'} ${row.muted ? 'text-muted' : 'text-fg'}`}
+        } ${row.serif ? 'font-serif text-[1.375rem] leading-snug' : 'text-xl tabular-nums'} text-fg`}
       >
         {row.value}
       </span>
@@ -184,23 +197,14 @@ function DirectoryRow({ row, first }: { row: Row; first?: boolean }) {
 }
 
 function Directory() {
-  const { phone, email, links, hours } = doctor.contact
-  const hoursMuted = hours.every((h) => isPlaceholder(h.days))
-
-  // Placeholder text is shown when a value is missing, and is never a link.
-  const rows: Row[] = [
-    phone ? { label: 'Telephone', value: phone, href: `tel:${phone.replace(/\s+/g, '')}` } : { label: 'Telephone', value: '[PHONE]', muted: true },
-    email ? { label: 'Email', value: email, href: `mailto:${email}` } : { label: 'Email', value: '[EMAIL]', muted: true },
-    ...(links.length > 0
-      ? links.map((l, i) => ({ label: i === 0 ? 'Professional profiles' : '', value: l.label, href: l.href, external: true, serif: true }))
-      : [{ label: 'Professional profiles', value: '[PROFESSIONAL PROFILES]', muted: true }]),
-  ]
+  const rows = contactRows
 
   return (
     <section aria-label="Contact details and working hours" className="border-t border-line bg-surface">
       <div className="container-page section-y">
         <div className="grid gap-16 lg:grid-cols-12 lg:gap-10">
           {/* Contact methods */}
+          {rows.length > 0 && (
           <div className="lg:col-span-7">
             <RevealText as="h2" id="details-title" lines={['Contact details']} className="heading-2" />
             <ul className="relative mt-8 border-b border-line">
@@ -210,13 +214,15 @@ function Directory() {
               ))}
             </ul>
           </div>
+          )}
 
           {/* Working hours */}
-          <div className="lg:col-span-4 lg:col-start-9">
+          {hours.length > 0 && (
+          <div className={rows.length > 0 ? 'lg:col-span-4 lg:col-start-9' : 'lg:col-span-5'}>
             <RevealText as="h2" id="hours-title" lines={['Working hours']} className="heading-2" />
             <div className="relative mt-8">
               <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1} delay={0.1} />
-              <table className={`w-full border-collapse text-left ${hoursMuted ? 'text-muted' : ''}`} aria-labelledby="hours-title">
+              <table className="w-full border-collapse text-left" aria-labelledby="hours-title">
                 <tbody>
                   {hours.map((h, i) => (
                     <tr key={i} className="border-b border-line">
@@ -230,6 +236,7 @@ function Directory() {
               </table>
             </div>
           </div>
+          )}
         </div>
       </div>
     </section>

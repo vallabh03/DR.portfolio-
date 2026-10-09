@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useScroll } from 'motion/react'
-import { doctor, isPlaceholder } from '../data/doctor'
+import { doctor, hasValue, publishable } from '../data/doctor'
 import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import MedicalImage from '../components/MedicalImage'
@@ -11,6 +11,14 @@ import BookingPrompt from '../components/BookingPrompt'
 const pad = (n: number) => String(n).padStart(2, '0')
 const entryId = (i: number) => `record-${i + 1}`
 
+/** Roles that can be published: those with a confirmed position. */
+const roles = doctor.experience.filter((r) => hasValue(r.role))
+
+/** Credential categories with at least one confirmed entry; empty categories are left out. */
+const credentialGroups = doctor.credentials
+  .map((g) => ({ category: g.category, items: g.items.filter((c) => hasValue(c.title)) }))
+  .filter((g) => g.items.length > 0)
+
 /**
  * Experience: a formal professional record. The dates drive the composition:
  * a chronology whose sticky year rolls to the entry being read, followed by a
@@ -20,8 +28,8 @@ export default function Experience() {
   return (
     <>
       <Opening />
-      <Chronology />
-      <Credentials />
+      {roles.length > 0 && <Chronology />}
+      {credentialGroups.length > 0 && <Credentials />}
       <BookingPrompt />
     </>
   )
@@ -70,7 +78,7 @@ function useActiveEntry(count: number) {
 }
 
 function Chronology() {
-  const items = doctor.experience
+  const items = roles
   const listRef = useRef<HTMLOListElement>(null)
   const { active, direction } = useActiveEntry(items.length)
   const animated = useDecorativeMotion()
@@ -99,9 +107,6 @@ function Chronology() {
               <Entry key={i} index={i} state={i < active ? 'passed' : i === active ? 'current' : 'upcoming'} {...item} />
             ))}
           </ol>
-          <p className="mt-10 pl-[calc(1.25rem+1.5rem)] text-sm text-muted sm:pl-[calc(1.25rem+2.5rem)]">
-            Dates, positions and institutions will be added once verified.
-          </p>
         </div>
       </div>
     </section>
@@ -163,27 +168,23 @@ function Marker({ state }: { state: EntryState }) {
 }
 
 function Entry({ index, state, year, role, institution, location, description, highlights }: { index: number; state: EntryState } & (typeof doctor.experience)[number]) {
+  const place = [institution, location].filter(hasValue).join(', ')
+  const points = publishable(highlights)
   return (
     <li id={entryId(index)} className="relative grid grid-cols-[1.25rem_1fr] gap-x-6 pb-14 last:pb-0 sm:gap-x-10 md:pb-20 lg:min-h-[55vh]">
       <Marker state={state} />
       <article aria-labelledby={`${entryId(index)}-title`} className="min-w-0">
         {/* Year: inline below desktop; on desktop it is carried by the sticky indicator and kept for screen readers */}
-        <p className="font-serif text-[clamp(2rem,1.6rem+1.6vw,2.5rem)] leading-none tabular-nums text-brass lg:sr-only">{year}</p>
-        <h3
-          id={`${entryId(index)}-title`}
-          className={`mt-3 font-serif text-[clamp(1.75rem,1.45rem+1.2vw,2.5rem)] leading-[1.1] tracking-[-0.015em] lg:mt-0 ${isPlaceholder(role) ? 'text-fg/75' : ''}`}
-        >
+        {hasValue(year) && <p className="font-serif text-[clamp(2rem,1.6rem+1.6vw,2.5rem)] leading-none tabular-nums text-brass lg:sr-only">{year}</p>}
+        <h3 id={`${entryId(index)}-title`} className="mt-3 font-serif text-[clamp(1.75rem,1.45rem+1.2vw,2.5rem)] leading-[1.1] tracking-[-0.015em] lg:mt-0">
           {role}
         </h3>
-        <p className="mt-2 text-muted">
-          {institution}
-          {location ? `, ${location}` : ''}
-        </p>
-        <p className={`measure mt-5 text-lg leading-[1.7] ${isPlaceholder(description) ? 'text-muted' : 'text-fg/90'}`}>{description}</p>
-        {highlights && highlights.length > 0 && (
+        {place && <p className="mt-2 text-muted">{place}</p>}
+        {hasValue(description) && <p className="measure mt-5 text-lg leading-[1.7] text-fg/90">{description}</p>}
+        {points.length > 0 && (
           <ul className="measure mt-6 border-t border-line">
-            {highlights.map((h, j) => (
-              <li key={j} className={`flex gap-3 border-b border-line py-3 ${isPlaceholder(h) ? 'text-muted' : ''}`}>
+            {points.map((h, j) => (
+              <li key={j} className="flex gap-3 border-b border-line py-3">
                 <span aria-hidden className="mt-[0.8em] h-px w-3 shrink-0 bg-brass" />
                 {h}
               </li>
@@ -200,7 +201,7 @@ function Entry({ index, state, year, role, institution, location, description, h
 function Credentials() {
   const animated = useDecorativeMotion()
   const [filter, setFilter] = useState<string>('All')
-  const groups = doctor.credentials
+  const groups = credentialGroups
 
   // Number every credential once, so identity stays stable while filtering.
   const all = useMemo(
@@ -275,18 +276,15 @@ function Credentials() {
                       transition={{ duration: 0.4, ease: EASE }}
                       className="group grid gap-x-8 gap-y-2 border-b border-line py-6 sm:grid-cols-[5rem_1fr] lg:grid-cols-[5rem_1fr_13rem]"
                     >
-                      <span className="font-serif text-lg tabular-nums text-brass">{c.year}</span>
+                      {/* The year column keeps its place for alignment, empty when no year is given */}
+                      <span className="font-serif text-lg tabular-nums text-brass">{hasValue(c.year) ? c.year : null}</span>
                       <div className="min-w-0">
-                        <h3
-                          className={`font-serif text-[1.375rem] leading-snug transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 ${
-                            isPlaceholder(c.title) ? 'text-fg/75' : ''
-                          }`}
-                        >
+                        <h3 className="font-serif text-[1.375rem] leading-snug transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">
                           {c.title}
                         </h3>
-                        <p className={`mt-1 text-sm leading-relaxed ${isPlaceholder(c.description) ? 'text-muted' : 'text-fg/80'}`}>{c.description}</p>
+                        {hasValue(c.description) && <p className="mt-1 text-sm leading-relaxed text-fg/80">{c.description}</p>}
                         <p className="mt-2 text-xs text-muted">{c.category}</p>
-                        {c.link && (
+                        {hasValue(c.link) && (
                           <a
                             href={c.link}
                             target="_blank"
@@ -299,9 +297,7 @@ function Credentials() {
                           </a>
                         )}
                       </div>
-                      <p className={`text-sm sm:col-start-2 lg:col-start-auto lg:text-right ${isPlaceholder(c.institution) ? 'text-muted' : 'text-fg/85'}`}>
-                        {c.institution}
-                      </p>
+                      {hasValue(c.institution) && <p className="text-sm text-fg/85 sm:col-start-2 lg:col-start-auto lg:text-right">{c.institution}</p>}
                     </motion.li>
                   ))}
                 </AnimatePresence>

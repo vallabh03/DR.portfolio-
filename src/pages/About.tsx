@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react'
 import { Link } from 'react-router'
-import { doctor, isPlaceholder } from '../data/doctor'
+import { aboutHeading, doctor, hasValue, publishable } from '../data/doctor'
 import { EASE, EASE_EXIT, EASE_IN_OUT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import { useScrollTrack } from '../hooks/useScrollTrack'
 import RevealText from '../components/RevealText'
@@ -24,10 +24,11 @@ export default function About() {
   return (
     <>
       <Opener />
-      <Profile />
+      {chapters.length > 0 && <Profile />}
       <FactFile />
       <Practice />
-      <ApproachToCare />
+      {/* Shown only once the doctor has supplied and approved the stages */}
+      {doctor.approach.some((s) => hasValue(s.title)) && <ApproachToCare />}
       <BookingPrompt />
     </>
   )
@@ -71,7 +72,8 @@ function CentreReveal() {
 
 function Opener() {
   const entrance = useEntrance()
-  const byline = [doctor.title, doctor.contact.clinic, doctor.about.languages.join(', ')]
+  const byline = [doctor.title, doctor.contact.clinic, publishable(doctor.about.languages).join(', ')].filter(hasValue)
+  const bio = publishable(doctor.bioFull)
 
   return (
     <section aria-labelledby="about-title" className="container-page pb-16 pt-10 md:pb-24 md:pt-16 lg:pt-20">
@@ -87,22 +89,33 @@ function Opener() {
         </div>
 
         <div className="order-1 lg:order-3 lg:col-span-6 lg:self-center">
-          <RevealText as="h1" id="about-title" lines={['About Dr.', 'Abhinav Thaduri']} className="heading-1" delay={0.1} immediate />
+          <RevealText as="h1" id="about-title" lines={aboutHeading} className="heading-1" delay={0.1} immediate />
           <motion.div {...entrance(0.55)}>
-            <ul className="mt-8 flex flex-col gap-1.5 text-sm text-muted sm:flex-row sm:flex-wrap sm:gap-y-2" aria-label="At a glance">
-              {byline.map((b, i) => (
-                <li key={i} className={`flex items-center ${isPlaceholder(b) ? '' : 'text-fg/85'}`}>
-                  {i > 0 && (
-                    <span aria-hidden className="mx-3 hidden text-line-strong sm:inline">
-                      ·
-                    </span>
-                  )}
-                  {b}
-                </li>
-              ))}
-            </ul>
-            <span aria-hidden className="mt-8 block h-px w-16 bg-accent" />
-            <p className={`lead measure mt-8 ${isPlaceholder(doctor.biography) ? '' : 'text-fg/85'}`}>{doctor.biography}</p>
+            {byline.length > 0 && (
+              <ul className="mt-8 flex flex-col gap-1.5 text-sm text-muted sm:flex-row sm:flex-wrap sm:gap-y-2" aria-label="At a glance">
+                {byline.map((b, i) => (
+                  <li key={i} className="flex items-center text-fg/85">
+                    {i > 0 && (
+                      <span aria-hidden className="mx-3 hidden text-line-strong sm:inline">
+                        ·
+                      </span>
+                    )}
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/* The biography, one paragraph per entry */}
+            {bio.length > 0 && (
+              <>
+                <span aria-hidden className="mt-8 block h-px w-16 bg-accent" />
+                {bio.map((paragraph, i) => (
+                  <p key={i} className={`lead measure text-fg/85 ${i === 0 ? 'mt-8' : 'mt-5'}`}>
+                    {paragraph}
+                  </p>
+                ))}
+              </>
+            )}
           </motion.div>
         </div>
       </div>
@@ -110,15 +123,21 @@ function Opener() {
   )
 }
 
-/* ── 2. The profile: three chapters with a quiet reading guide ───────────── */
+/* ── 2. The profile: up to three chapters with a quiet reading guide ─────── */
+
+type ChapterKind = 'journey' | 'philosophy' | 'patient'
+
+/** Only chapters with text are shown; numbering, navigation and spacing follow the ones present. */
+const chapters = (
+  [
+    { id: 'chapter-journey', kind: 'journey', title: 'Professional journey', body: doctor.about.journey },
+    // The doctor's approach statement when supplied, otherwise the philosophy text.
+    { id: 'chapter-philosophy', kind: 'philosophy', title: 'Clinical philosophy', body: [doctor.approachStatement, doctor.about.philosophy].find(hasValue) },
+    { id: 'chapter-patient', kind: 'patient', title: 'Patient-centred approach', body: doctor.about.patientCentered },
+  ] satisfies { id: string; kind: ChapterKind; title: string; body?: string }[]
+).filter((c): c is typeof c & { body: string } => hasValue(c.body))
 
 function Profile() {
-  const { about } = doctor
-  const chapters = [
-    { id: 'chapter-journey', title: 'Professional journey', body: about.journey },
-    { id: 'chapter-philosophy', title: 'Clinical philosophy', body: about.philosophy },
-    { id: 'chapter-patient', title: 'Patient-centred approach', body: about.patientCentered },
-  ]
   const articleRef = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
 
@@ -192,43 +211,30 @@ function Profile() {
 
           {/* The article */}
           <div ref={articleRef} className="space-y-16 md:space-y-24 lg:col-span-8 lg:col-start-5">
-            {/* 01: Professional journey, opening with a drop cap once real text exists */}
-            <article id={chapters[0].id} aria-labelledby="journey-title" tabIndex={-1} className="focus:outline-none">
-              <ChapterHead n={1} id="journey-title" title={chapters[0].title} />
-              <p
-                className={`measure mt-6 text-lg leading-[1.7] ${
-                  isPlaceholder(about.journey)
-                    ? 'text-muted'
-                    : 'text-fg/90 first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:font-serif first-letter:text-[4.25rem] first-letter:leading-[0.8] first-letter:text-fg'
-                }`}
-              >
-                {about.journey}
-              </p>
-            </article>
-
-            {/* 02: Clinical philosophy, set as a quotation within the article */}
-            <article id={chapters[1].id} aria-labelledby="philosophy-title" tabIndex={-1} className="focus:outline-none">
-              <ChapterHead n={2} id="philosophy-title" title={chapters[1].title} />
-              <figure className="relative mt-8 py-10 md:py-12">
-                <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />
-                <blockquote
-                  className={`font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.375rem)] leading-[1.3] tracking-[-0.01em] ${
-                    isPlaceholder(about.philosophy) ? 'text-muted' : ''
-                  }`}
-                >
-                  {about.philosophy}
-                </blockquote>
-                <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.1} delay={0.15} />
-              </figure>
-            </article>
-
-            {/* 03: Patient-centred approach */}
-            <article id={chapters[2].id} aria-labelledby="patient-title" tabIndex={-1} className="focus:outline-none">
-              <ChapterHead n={3} id="patient-title" title={chapters[2].title} />
-              <p className={`measure mt-6 text-lg leading-[1.7] ${isPlaceholder(about.patientCentered) ? 'text-muted' : 'text-fg/90'}`}>
-                {about.patientCentered}
-              </p>
-            </article>
+            {chapters.map((c, i) => (
+              <article key={c.id} id={c.id} aria-labelledby={`${c.id}-title`} tabIndex={-1} className="focus:outline-none">
+                <ChapterHead n={i + 1} id={`${c.id}-title`} title={c.title} />
+                {c.kind === 'philosophy' ? (
+                  // Clinical philosophy, set as a quotation within the article
+                  <figure className="relative mt-8 py-10 md:py-12">
+                    <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />
+                    <blockquote className="font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.375rem)] leading-[1.3] tracking-[-0.01em]">{c.body}</blockquote>
+                    <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.1} delay={0.15} />
+                  </figure>
+                ) : (
+                  <p
+                    className={`measure mt-6 text-lg leading-[1.7] text-fg/90 ${
+                      // The professional journey opens with a drop cap
+                      c.kind === 'journey'
+                        ? 'first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:font-serif first-letter:text-[4.25rem] first-letter:leading-[0.8] first-letter:text-fg'
+                        : ''
+                    }`}
+                  >
+                    {c.body}
+                  </p>
+                )}
+              </article>
+            ))}
           </div>
         </div>
       </div>
@@ -251,12 +257,14 @@ function ChapterHead({ n, id, title }: { n: number; id: string; title: string })
 
 function FactFile() {
   const { about } = doctor
+  // Rows with no confirmed entries are left out; the section is hidden if none remain.
   const rows = [
-    { title: 'Education', items: about.education },
-    { title: 'Training', items: about.training },
-    { title: 'Experience', items: about.experience },
-    { title: 'Languages', items: about.languages },
-  ]
+    { title: 'Education', items: publishable(about.education) },
+    { title: 'Training', items: publishable(about.training) },
+    { title: 'Experience', items: publishable(about.experience) },
+    { title: 'Languages', items: publishable(about.languages) },
+  ].filter((r) => r.items.length > 0)
+  if (rows.length === 0) return null
 
   return (
     <section aria-labelledby="facts-title" className="border-t border-line bg-surface">
@@ -278,7 +286,7 @@ function FactFile() {
                 <dd>
                   <ul className="space-y-1.5">
                     {r.items.map((item, j) => (
-                      <li key={j} className={`text-lg ${isPlaceholder(item) ? 'text-muted' : ''}`}>
+                      <li key={j} className="text-lg">
                         {item}
                       </li>
                     ))}
@@ -332,7 +340,7 @@ function Practice() {
           </motion.div>
         </motion.div>
         <figcaption className="mt-5 flex flex-col gap-3 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-          <span className={isPlaceholder(clinic) ? '' : 'text-fg/85'}>{clinic}</span>
+          {hasValue(clinic) && <span className="text-fg/85">{clinic}</span>}
           <Link to="/contact" className="group/btn inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
             <span className="link-underline">Visit and contact</span>
             <ArrowRight />
@@ -346,7 +354,7 @@ function Practice() {
 /* ── 5. Approach to care: a line that fills as you read ──────────────────── */
 
 function ApproachToCare() {
-  const stages = doctor.approach
+  const stages = doctor.approach.filter((s) => hasValue(s.title))
   const listRef = useRef<HTMLOListElement>(null)
   const { progress, reached } = useScrollTrack(listRef, stages.length)
   const animated = useDecorativeMotion()
@@ -358,10 +366,6 @@ function ApproachToCare() {
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
           <div className="lg:col-span-5 lg:sticky lg:top-32 lg:self-start">
             <RevealText as="h2" id="approach-title" lines={['Approach to care']} className="heading-2" />
-            <p className="lead measure mt-6">
-              What to expect, from the first conversation to follow-up. Every patient is different. This describes the general
-              process, not a promise of any particular outcome.
-            </p>
             {/* Stage counter: the number rolls to the next stage */}
             <p className="mt-10 hidden items-baseline font-serif text-2xl tabular-nums lg:flex" aria-hidden>
               <span className="relative inline-block h-[1.2em] overflow-hidden text-brass">
@@ -411,12 +415,6 @@ function ApproachToCare() {
             })}
           </ol>
         </div>
-
-        <p className="measure mt-16 rounded-lg border border-line bg-bg p-6 leading-relaxed text-muted sm:p-8">
-          <span className="mb-2 block font-medium text-fg">Please note</span>
-          Treatment decisions depend on each person’s circumstances and are made together after a full clinical assessment. No
-          specific result can be guaranteed.
-        </p>
       </div>
     </section>
   )

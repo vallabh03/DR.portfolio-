@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { doctor, isPlaceholder } from '../data/doctor'
+import { doctor, hasValue, publishable } from '../data/doctor'
 import { EASE, EASE_IN_OUT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import MedicalImage from '../components/MedicalImage'
@@ -13,6 +13,11 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 const roman = (n: number) => ROMAN[n - 1] ?? String(n)
 
+/** Research categories with at least one confirmed entry; empty categories are left out. */
+const groups = doctor.research
+  .map((g) => ({ category: g.category, items: g.items.filter((i) => hasValue(i.title)) }))
+  .filter((g) => g.items.length > 0)
+
 /**
  * Research: a journal and its bibliography. The opening sets the research
  * interests as a numbered index; a frontispiece follows; then every entry is
@@ -23,7 +28,7 @@ export default function Research() {
     <>
       <Opening />
       <Frontispiece />
-      <VerificationStatus />
+      {groups.length > 0 && <VerificationStatus />}
       <Bibliography />
       <BookingPrompt />
     </>
@@ -35,20 +40,22 @@ export default function Research() {
 function Opening() {
   const entrance = useEntrance()
   const animated = useDecorativeMotion()
-  const interests = doctor.researchInterests
+  const interests = publishable(doctor.researchInterests)
 
   return (
     <section aria-labelledby="research-title" className="container-page pb-12 pt-10 md:pb-16 md:pt-16 lg:pt-24">
       <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-5">
           <RevealText as="h1" id="research-title" lines={['Research and', 'academic work']} className="heading-1" delay={0.1} immediate />
-          <motion.p className="lead measure mt-8" {...entrance(0.4)}>
-            Research interests, publications, clinical studies, conferences and presentations. Entries are listed only once they
-            have been verified, with links to the original sources.
-          </motion.p>
+          {hasValue(doctor.researchIntro) && (
+            <motion.p className="lead measure mt-8" {...entrance(0.4)}>
+              {doctor.researchIntro}
+            </motion.p>
+          )}
         </div>
 
         {/* The interests as a numbered index; each line rises in order, once */}
+        {interests.length > 0 && (
         <div className="lg:col-span-7 lg:pt-2">
           <h2 className="heading-3">Research interests</h2>
           <ol className="relative mt-5">
@@ -60,9 +67,7 @@ function Opening() {
                 </span>
                 <span className="block overflow-hidden pb-[0.1em] -mb-[0.1em]">
                   <motion.span
-                    className={`block font-serif text-[clamp(1.75rem,1.35rem+1.6vw,2.75rem)] leading-[1.15] tracking-[-0.015em] ${
-                      isPlaceholder(interest) ? 'text-fg/75' : ''
-                    }`}
+                    className="block font-serif text-[clamp(1.75rem,1.35rem+1.6vw,2.75rem)] leading-[1.15] tracking-[-0.015em]"
                     initial={animated ? { y: '108%' } : false}
                     animate={{ y: '0%' }}
                     transition={{ duration: 0.9, ease: EASE, delay: 0.35 + i * 0.12 }}
@@ -74,6 +79,7 @@ function Opening() {
             ))}
           </ol>
         </div>
+        )}
       </div>
     </section>
   )
@@ -114,23 +120,18 @@ function Frontispiece() {
   )
 }
 
-/* ── 3. Verification status: one quiet line until anything is verified ─── */
+/* ── 3. Verification status: a count of entries by category, once any exist ── */
 
 function VerificationStatus() {
   const animated = useDecorativeMotion()
-  const rows = doctor.research
-    .map((g) => ({ category: g.category, verified: g.items.filter((i) => !isPlaceholder(i.title)).length }))
-    .filter((r) => r.verified > 0)
+  const rows = groups.map((g) => ({ category: g.category, verified: g.items.length }))
   const total = rows.reduce((sum, r) => sum + r.verified, 0)
   const max = Math.max(1, ...rows.map((r) => r.verified))
 
   return (
     <section aria-label="Verification status" className="container-page pb-4">
       <div className="border-y border-line py-5">
-        {total === 0 ? (
-          <p className="text-muted">No entries have been verified yet. This record updates as each entry is confirmed.</p>
-        ) : (
-          <>
+        <>
             <p className="text-muted">
               <Counter value={total} className="font-serif text-lg text-brass" /> verified {total === 1 ? 'entry' : 'entries'}
             </p>
@@ -166,8 +167,7 @@ function VerificationStatus() {
                 ))}
               </tbody>
             </table>
-          </>
-        )}
+        </>
       </div>
     </section>
   )
@@ -176,6 +176,7 @@ function VerificationStatus() {
 /* ── 4. Bibliography: numbered references under running heads ────────────── */
 
 function Bibliography() {
+  if (groups.length === 0) return null
   // Reference numbers run continuously through the whole bibliography.
   let ref = 0
 
@@ -184,7 +185,7 @@ function Bibliography() {
       <RevealText as="h2" id="bibliography-title" lines={['Publications and work']} className="heading-2" />
 
       <div className="mt-12 space-y-16 md:mt-16 md:space-y-24">
-        {doctor.research.map((group, gi) => (
+        {groups.map((group, gi) => (
           <section key={group.category} aria-labelledby={`group-${gi}`} className="grid gap-6 lg:grid-cols-12 lg:gap-10">
             {/* Running head: stays in view while its group is read (desktop) */}
             <div className="lg:col-span-4">
@@ -200,24 +201,20 @@ function Bibliography() {
               {group.items.map((item, ii) => {
                 ref += 1
                 const n = ref
-                const citation = [item.venue, item.year].filter(Boolean).join(', ')
+                const citation = [item.venue, item.year].filter(hasValue).join(', ')
                 return (
                   <li key={ii} className="group grid grid-cols-[3rem_1fr] gap-x-4 border-b border-line py-7 first:pt-0 sm:grid-cols-[4rem_1fr] md:py-8 md:first:pt-0">
                     <span aria-hidden className="pt-1 font-serif tabular-nums text-brass">
                       [{pad(n)}]
                     </span>
                     <div className="min-w-0">
-                      <h4
-                        className={`font-serif text-[clamp(1.375rem,1.25rem+0.5vw,1.625rem)] leading-snug tracking-[-0.01em] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 ${
-                          isPlaceholder(item.title) ? 'text-fg/75' : ''
-                        }`}
-                      >
+                      <h4 className="font-serif text-[clamp(1.375rem,1.25rem+0.5vw,1.625rem)] leading-snug tracking-[-0.01em] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">
                         <span className="sr-only">Reference {n}: </span>
                         {item.title}
                       </h4>
                       {citation && <p className="mt-2 text-sm text-muted">{citation}</p>}
-                      <p className={`measure mt-4 leading-relaxed ${isPlaceholder(item.description) ? 'text-muted' : 'text-fg/85'}`}>{item.description}</p>
-                      {item.link && (
+                      {hasValue(item.description) && <p className="measure mt-4 leading-relaxed text-fg/85">{item.description}</p>}
+                      {hasValue(item.link) && (
                         <a
                           href={item.link}
                           target="_blank"

@@ -9,7 +9,9 @@
  *  publications, patient numbers, outcome rates, testimonials, research or
  *  certifications that have not been verified.
  *
- *  Empty arrays are handled gracefully by the UI (e.g. testimonials).
+ *  Nothing here is shown to visitors unless it is publishable (see hasValue):
+ *  empty values and [PLACEHOLDERS] are hidden, along with their row, chapter,
+ *  category or section, so unconfirmed information never reaches the page.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -18,15 +20,15 @@ export type TimelineItem = {
   role: string
   institution: string
   location?: string
-  description: string
+  description?: string
   highlights?: string[]
 }
 
 export type Credential = {
   title: string
   institution: string
-  year: string
-  description: string
+  year?: string
+  description?: string
   link?: string
 }
 
@@ -38,14 +40,16 @@ export type CredentialGroup = {
 export type ExpertiseItem = {
   title: string
   description: string
-  details: string[]
-  image: string
+  /** Conditions and procedures; the list is hidden when empty. */
+  details?: string[]
+  /** Illustrative image in /public/images; the area works without one. */
+  image?: string
 }
 
 export type ResearchItem = {
   title: string
-  description: string
-  year: string
+  description?: string
+  year?: string
   venue?: string
   link?: string
 }
@@ -67,16 +71,79 @@ export type ApproachStage = {
   description: string
 }
 
-export const doctor = {
+export type Registration = {
+  body: string
+  number: string
+  /** Published only when true. */
+  show: boolean
+}
+
+export type Contact = {
+  clinic: string
+  addressLine?: string
+  /** City, state and country. */
+  locality?: string
+  postcode?: string
+  phone?: string
+  email?: string
+  hours: { days: string; time: string }[]
+  mapUrl?: string
+  links: { label: string; href: string }[]
+}
+
+export type Doctor = {
+  name: string
+  firstLine: string
+  lastLine: string
+  initials: string
+  title: string
+  specialty?: string
+  /** Qualification line, e.g. degrees after the name. */
+  qualifications?: string
+  /** Homepage headline and the sentence beneath it. */
+  headline?: string
+  headlineSupport?: string
+  /** Short biography for the homepage. */
+  bioShort?: string
+  /** Full biography for the About page, one string per paragraph. */
+  bioFull?: string[]
+  /** The doctor's approach to care, in their own words (Home quote, About philosophy). */
+  approachStatement?: string
+  registration?: Registration
+  about: {
+    journey: string
+    philosophy: string
+    patientCentered: string
+    education: string[]
+    training: string[]
+    experience: string[]
+    languages: string[]
+  }
+  experience: TimelineItem[]
+  credentials: CredentialGroup[]
+  expertise: ExpertiseItem[]
+  approach: ApproachStage[]
+  researchIntro?: string
+  researchInterests: string[]
+  research: ResearchGroup[]
+  testimonials: Testimonial[]
+  contact: Contact
+  booking: { endpoint: string }
+  seo: { siteUrl: string }
+}
+
+export const doctor: Doctor = {
   name: 'Dr. Abhinav Thaduri',
   firstLine: 'Dr. Abhinav',
   lastLine: 'Thaduri',
   initials: 'AT',
   title: '[VERIFY SPECIALTY]',
-  statement: ['Precision in diagnosis.', 'Compassion in care.', 'Evidence in every decision.'],
 
-  biography:
-    '[DOCTOR BIO] — A short, first-person introduction to Dr. Abhinav Thaduri will appear here once it has been written and verified. It should describe Dr. Thaduri as a clinician, the patients cared for, and what shapes this approach to medicine.',
+  // Not yet filled in: each waits for confirmed wording from the doctor.
+  // specialty, qualifications, headline, headlineSupport, bioShort, approachStatement: strings
+  // bioFull: one string per paragraph
+  // registration: { body, number, show }
+  bioFull: [],
 
   about: {
     journey:
@@ -116,15 +183,7 @@ export const doctor = {
       description: '[DESCRIPTION OF ROLE AND RESPONSIBILITIES]',
       highlights: ['[KEY RESPONSIBILITY]', '[KEY RESPONSIBILITY]'],
     },
-    {
-      year: '[YEAR]',
-      role: '[POSITION]',
-      institution: '[INSTITUTION]',
-      location: '[CITY]',
-      description: '[DESCRIPTION OF ROLE AND RESPONSIBILITIES]',
-      highlights: ['[KEY RESPONSIBILITY]', '[KEY RESPONSIBILITY]'],
-    },
-  ] as TimelineItem[],
+  ],
 
   credentials: [
     {
@@ -184,37 +243,12 @@ export const doctor = {
   ] as ExpertiseItem[],
 
   /**
-   * A general description of how a consultation unfolds. It deliberately makes
-   * no promises about outcomes — edit wording with Dr. Thaduri before launch.
+   * The stages of a consultation, only in wording supplied and approved by the
+   * doctor. While this is empty the stage sequences on Home and About are hidden.
    */
-  approach: [
-    {
-      title: 'Consultation',
-      description:
-        'A conversation first. Time to hear your concerns, your history and what matters most to you — in your own words.',
-    },
-    {
-      title: 'Assessment',
-      description:
-        'A careful clinical examination, together with a review of previous records and any relevant tests.',
-    },
-    {
-      title: 'Diagnosis',
-      description:
-        'Findings are explained clearly, including what is known, what is still uncertain, and why.',
-    },
-    {
-      title: 'Treatment Planning',
-      description:
-        'Options are discussed openly — their benefits, risks and alternatives — so decisions are made together.',
-    },
-    {
-      title: 'Follow-up',
-      description:
-        'Progress is reviewed over time, and the plan is adjusted as your needs change.',
-    },
-  ] as ApproachStage[],
+  approach: [],
 
+  // researchIntro: the Research page introduction (not yet filled in)
   researchInterests: ['[RESEARCH INTEREST]', '[RESEARCH INTEREST]', '[RESEARCH INTEREST]'],
 
   research: [
@@ -248,16 +282,14 @@ export const doctor = {
 
   contact: {
     clinic: '[CLINIC / HOSPITAL NAME]',
-    address: '[STREET ADDRESS]',
-    city: '[CITY, POSTCODE]',
+    addressLine: '[STREET ADDRESS]',
+    locality: '[CITY, STATE, COUNTRY]',
+    postcode: '[POSTCODE]',
     phone: '',
     email: '',
-    hours: [
-      { days: '[DAYS]', time: '[HOURS]' },
-      { days: '[DAYS]', time: '[HOURS]' },
-    ],
+    hours: [{ days: '[DAYS]', time: '[HOURS]' }],
     mapUrl: '',
-    links: [] as { label: string; href: string }[],
+    links: [],
   },
 
   booking: {
@@ -274,7 +306,22 @@ export const doctor = {
   },
 }
 
-export type Doctor = typeof doctor
-
 /** True for strings that are still unverified placeholders. */
 export const isPlaceholder = (value: string) => /^\[.*\]/.test(value.trim())
+
+/** True when a value can be shown to visitors: present, not blank, and not a [PLACEHOLDER]. */
+export const hasValue = (value?: string | null): value is string => typeof value === 'string' && value.trim() !== '' && !isPlaceholder(value)
+
+/** Only the publishable entries of a list. */
+export const publishable = (values?: string[]) => (values ?? []).filter(hasValue)
+
+/* ── Name-based text, derived so it always follows doctor.name ──────────── */
+
+const [honorific, ...givenAndFamily] = doctor.name.split(' ')
+const hasHonorific = /^Dr\.?$/i.test(honorific)
+
+/** "Dr. Thaduri": honorific and family name, for links such as "About Dr. Thaduri". */
+export const shortName = hasHonorific ? `${honorific} ${givenAndFamily[givenAndFamily.length - 1]}` : doctor.name
+
+/** The About page heading, as two lines: "About Dr." / "Abhinav Thaduri". */
+export const aboutHeading: [string, string] = hasHonorific ? [`About ${honorific}`, givenAndFamily.join(' ')] : ['About', doctor.name]

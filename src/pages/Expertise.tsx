@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Link } from 'react-router'
-import { doctor, isPlaceholder } from '../data/doctor'
+import { doctor, hasValue, publishable } from '../data/doctor'
 import { BOOK_PATH } from '../data/navigation'
 import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
@@ -13,20 +13,24 @@ import BookingPrompt from '../components/BookingPrompt'
 const pad = (n: number) => String(n).padStart(2, '0')
 const areaId = (i: number) => `area-${i + 1}`
 
+/** The areas that can be published: those with a confirmed title. */
+const areas = doctor.expertise.filter((e) => hasValue(e.title))
+/** The sticky image plate is used only when at least one area has an image. */
+const hasPlates = areas.some((a) => hasValue(a.image))
+
 /**
  * Expertise: a clinical atlas. One entry per area of focus, each with its
  * conditions and procedures always visible. On desktop a sticky image plate
  * follows the entry being read: the plate wipes upward to the next image, its
- * number rolls, and a four-part indicator shows position in the sequence.
+ * number rolls, and an indicator shows position in the sequence.
  */
 export default function Expertise() {
-  const items = doctor.expertise
-  const active = useActiveArea(items.length)
+  const active = useActiveArea(areas.length)
 
   return (
     <>
       <Opening active={active} />
-      <Atlas active={active} />
+      {areas.length > 0 && <Atlas active={active} />}
       <ClosingNote />
       <BookingPrompt />
     </>
@@ -65,7 +69,7 @@ function useJumpTo() {
 function Opening({ active }: { active: number }) {
   const entrance = useEntrance()
   const jumpTo = useJumpTo()
-  const items = doctor.expertise
+  const items = areas
 
   return (
     <section aria-labelledby="expertise-title" className="container-page pb-12 pt-10 md:pb-16 md:pt-16 lg:pt-24">
@@ -76,7 +80,8 @@ function Opening({ active }: { active: number }) {
         </motion.p>
       </div>
 
-      {/* Table of contents: the four areas as one set */}
+      {/* Table of contents: the areas as one set */}
+      {items.length > 0 && (
       <nav aria-label="Areas of care" className="relative mt-12 md:mt-16">
         <DrawLine immediate delay={0.5} duration={1.2} className="absolute inset-x-0 top-0 bg-line-strong" />
         <ol className="grid lg:grid-cols-4 lg:gap-6">
@@ -112,6 +117,7 @@ function Opening({ active }: { active: number }) {
           ))}
         </ol>
       </nav>
+      )}
     </section>
   )
 }
@@ -119,17 +125,17 @@ function Opening({ active }: { active: number }) {
 /* ── 2. The atlas: sticky plate (desktop) beside the entries ─────────────── */
 
 function Atlas({ active }: { active: number }) {
-  const items = doctor.expertise
-
   return (
     <section aria-label="Areas of care in detail" className="border-t border-line">
       <div className="container-page pb-16 pt-12 md:pb-24 md:pt-16 lg:pb-32">
         <div className="grid gap-10 lg:grid-cols-12">
-          <div className="hidden lg:col-span-5 lg:block">
-            <Plate active={active} />
-          </div>
-          <div className="lg:col-span-7">
-            {items.map((item, i) => (
+          {hasPlates && (
+            <div className="hidden lg:col-span-5 lg:block">
+              <Plate active={active} />
+            </div>
+          )}
+          <div className={hasPlates ? 'lg:col-span-7' : 'lg:col-span-8'}>
+            {areas.map((item, i) => (
               <Entry key={i} index={i} isActive={active === i} title={item.title} description={item.description} details={item.details} image={item.image} />
             ))}
           </div>
@@ -141,7 +147,7 @@ function Atlas({ active }: { active: number }) {
 
 /** The sticky image plate: wipes upward between images, with a rolling number and progress. */
 function Plate({ active }: { active: number }) {
-  const items = doctor.expertise
+  const items = areas
   const animated = useDecorativeMotion()
   const item = items[active]
 
@@ -164,8 +170,9 @@ function Plate({ active }: { active: number }) {
               animate={{ scale: 1 }}
               transition={{ duration: 1.2, ease: EASE }}
             >
+              {/* An area without its own image shows the standard placeholder */}
               <MedicalImage
-                src={item.image}
+                src={hasValue(item.image) ? item.image : undefined}
                 sizes="(min-width: 1360px) 520px, 38vw"
                 alt={`${item.title}, illustrative image`}
                 placeholderLabel={`Expertise ${pad(active + 1)}`}
@@ -200,9 +207,10 @@ function Plate({ active }: { active: number }) {
             </span>
             / {pad(items.length)}
           </span>
-          <span className={`truncate text-right text-sm ${isPlaceholder(item.title) ? 'text-muted' : 'text-fg'}`}>{item.title}</span>
+          <span className="truncate text-right text-sm text-fg">{item.title}</span>
         </div>
-        <div className="mt-4 grid grid-cols-4 gap-2">
+        {/* One segment per area, however many there are */}
+        <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
           {items.map((_, i) => (
             <span
               key={i}
@@ -228,11 +236,12 @@ function Entry({
   isActive: boolean
   title: string
   description: string
-  details: string[]
-  image: string
+  details?: string[]
+  image?: string
 }) {
   const animated = useDecorativeMotion()
   const n = pad(index + 1)
+  const conditions = publishable(details)
 
   return (
     <article
@@ -243,15 +252,17 @@ function Entry({
     >
       {index > 0 && <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />}
 
-      {/* Phones and tablets: the image sits in the entry, opening once as it arrives */}
-      <MedicalImage
-        src={image}
-        sizes="(min-width: 768px) 90vw, 100vw"
-        alt={`${title}, illustrative image`}
-        placeholderLabel={`Expertise ${n}`}
-        hoverZoom={false}
-        className="mb-8 aspect-[4/3] w-full rounded-lg lg:hidden"
-      />
+      {/* Phones and tablets: the image sits in the entry, opening once as it arrives. Areas without an image have none. */}
+      {hasValue(image) && (
+        <MedicalImage
+          src={image}
+          sizes="(min-width: 768px) 90vw, 100vw"
+          alt={`${title}, illustrative image`}
+          placeholderLabel={`Expertise ${n}`}
+          hoverZoom={false}
+          className="mb-8 aspect-[4/3] w-full rounded-lg lg:hidden"
+        />
+      )}
 
       <div className="flex items-baseline gap-4">
         <span aria-hidden className="font-serif text-xl tabular-nums text-brass">
@@ -267,25 +278,24 @@ function Entry({
         />
       </div>
 
-      <h2
-        id={`${areaId(index)}-title`}
-        className={`mt-4 font-serif text-[clamp(2.25rem,1.7rem+2.4vw,3.5rem)] leading-[1.05] tracking-[-0.02em] ${
-          isPlaceholder(title) ? 'text-fg/75' : ''
-        }`}
-      >
+      <h2 id={`${areaId(index)}-title`} className="mt-4 font-serif text-[clamp(2.25rem,1.7rem+2.4vw,3.5rem)] leading-[1.05] tracking-[-0.02em]">
         {title}
       </h2>
       <DrawLine className="mt-6 w-16 bg-brass" duration={0.7} />
-      <p className={`measure mt-6 text-lg leading-[1.7] ${isPlaceholder(description) ? 'text-muted' : 'text-fg/90'}`}>{description}</p>
+      {hasValue(description) && <p className="measure mt-6 text-lg leading-[1.7] text-fg/90">{description}</p>}
 
-      <h3 className="label mt-10">Conditions and procedures</h3>
-      <ul className="measure mt-3 border-t border-line">
-        {details.map((d, j) => (
-          <li key={j} className={`border-b border-line py-3 ${isPlaceholder(d) ? 'text-muted' : ''}`}>
-            {d}
-          </li>
-        ))}
-      </ul>
+      {conditions.length > 0 && (
+        <>
+          <h3 className="label mt-10">Conditions and procedures</h3>
+          <ul className="measure mt-3 border-t border-line">
+            {conditions.map((d, j) => (
+              <li key={j} className="border-b border-line py-3">
+                {d}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </article>
   )
 }
@@ -296,7 +306,6 @@ function ClosingNote() {
   return (
     <section aria-label="About these listings" className="container-page pb-16 md:pb-24">
       <div className="flex flex-col gap-4 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-muted">Only verified specialties are listed here.</p>
         <Link to={BOOK_PATH} className="group/btn inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
           <span className="link-underline">Book a consultation</span>
           <ArrowRight />

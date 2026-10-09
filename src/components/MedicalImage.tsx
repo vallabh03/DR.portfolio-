@@ -5,7 +5,8 @@ import imageManifest from '../data/image-manifest.json'
 import { EASE, EASE_IN_OUT, ONCE, useDecorativeMotion } from '../lib/motion'
 
 type Props = {
-  src: string
+  /** Omit when there is no image for this slot: the placeholder is shown and nothing is requested. */
+  src?: string
   alt: string
   className?: string
   /** Eagerly load and reveal on mount (above-the-fold imagery). */
@@ -57,8 +58,8 @@ export default function MedicalImage({
     if (img?.complete) setStatus(img.naturalWidth > 0 ? 'loaded' : 'error')
   }, [src])
 
-  const file = src.split('/').pop()
-  const optimized = manifest[src]
+  const file = src?.split('/').pop()
+  const optimized = src ? manifest[src] : undefined
   const open = { clipPath: 'inset(0% 0% 0% 0%)' }
   const settle = { scale: 1 }
   const frameTrigger = priority ? { animate: open } : { whileInView: open, viewport: ONCE }
@@ -82,8 +83,8 @@ export default function MedicalImage({
             hoverZoom ? 'group-hover:scale-[1.02]' : ''
           }`}
         >
-          {status !== 'loaded' && <Placeholder label={placeholderLabel} file={file} alt={alt} />}
-          {status !== 'error' && (
+          {(status !== 'loaded' || !src) && <Placeholder label={placeholderLabel} file={file} alt={alt} />}
+          {src && status !== 'error' && (
             <picture>
               {/* AVIF, then WebP, then the original, only for images the optimiser has processed */}
               {optimized?.formats.map((format) => (

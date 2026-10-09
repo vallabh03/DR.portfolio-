@@ -2,12 +2,18 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { EASE_EXIT } from '../lib/motion'
+import { hasValue } from '../data/doctor'
 
 export type LegalDoc = 'privacy' | 'terms'
 
-const CONTENT: Record<LegalDoc, { title: string; body: string[] }> = {
+/**
+ * `published` stays false until the approved text replaces the placeholder
+ * below; unpublished documents have no footer link, so nothing here is shown.
+ */
+const CONTENT: Record<LegalDoc, { title: string; published: boolean; body: string[] }> = {
   privacy: {
     title: 'Privacy',
+    published: false,
     body: [
       '[PRIVACY POLICY]: The practice’s privacy policy will be published here once it has been prepared and approved.',
       'It should explain what information is collected through this website (for example, consultation requests), how it is stored, who can access it, how long it is kept, and how to request its deletion.',
@@ -15,12 +21,18 @@ const CONTENT: Record<LegalDoc, { title: string; body: string[] }> = {
   },
   terms: {
     title: 'Terms',
+    published: false,
     body: [
       '[TERMS OF USE]: The website terms of use will be published here once approved.',
       'Content on this website is for general information only and does not constitute medical advice or establish a doctor–patient relationship.',
     ],
   },
 }
+
+export const LEGAL_TITLES: Record<LegalDoc, string> = { privacy: CONTENT.privacy.title, terms: CONTENT.terms.title }
+
+/** Documents whose approved text is published, in footer order. */
+export const publishedLegalDocs = (Object.keys(CONTENT) as LegalDoc[]).filter((d) => CONTENT[d].published && CONTENT[d].body.some(hasValue))
 
 export default function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -74,7 +86,7 @@ export default function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; on
               </button>
             </div>
             <div className="mt-6 space-y-4 leading-relaxed text-muted">
-              {CONTENT[doc].body.map((p, i) => (
+              {CONTENT[doc].body.filter(hasValue).map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
             </div>

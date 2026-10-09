@@ -1,4 +1,4 @@
-import { doctor } from './doctor'
+import { doctor, hasValue } from './doctor'
 
 /**
  * The photographic record: every image slot the website already uses,
@@ -33,24 +33,30 @@ const page = {
   contact: { label: 'Contact', path: '/contact' },
 } satisfies Record<string, PageRef>
 
-/** Adds Expertise to a slot's pages when doctor.expertise also uses that image. */
-const withExpertise = (src: string, pages: PageRef[]) =>
-  doctor.expertise.some((e) => e.image === src) ? [...pages, page.expertise] : pages
-
-const CLINIC = '/images/clinic.jpg'
-
-const entries: Omit<GalleryEntry, 'no'>[] = [
+const slots: Omit<GalleryEntry, 'no'>[] = [
   { src: '/images/doctor-hero.jpg', caption: `Portrait of ${doctor.name}`, appearsOn: [page.home], group: 'Home', portrait: true },
   { src: '/images/doctor-about.jpg', caption: `Portrait of ${doctor.name}`, appearsOn: [page.about], group: 'About', portrait: true },
-  { src: CLINIC, caption: 'The clinic', appearsOn: withExpertise(CLINIC, [page.about, page.contact]), group: 'About' },
-  // Expertise images, except any already catalogued above (area 04 uses the clinic photograph).
+  { src: '/images/clinic.jpg', caption: 'The clinic', appearsOn: [page.about, page.contact], group: 'About' },
+  // Images of published expertise areas only (areas without a confirmed title or an image are not shown).
   ...doctor.expertise
-    .filter((e) => e.image !== CLINIC)
+    .filter((e): e is typeof e & { image: string } => hasValue(e.title) && hasValue(e.image))
     .map((e) => ({ src: e.image, caption: `${e.title}, illustrative image`, appearsOn: [page.expertise], group: 'Expertise' })),
   { src: '/images/credential-01.jpg', caption: 'Credential document', appearsOn: [page.experience], group: 'Experience and Research', portrait: true },
   { src: '/images/research.jpg', caption: 'Research and academic work', appearsOn: [page.research], group: 'Experience and Research' },
 ]
 
-export const gallery: GalleryEntry[] = entries.map((e, i) => ({ ...e, no: i + 1 }))
+/**
+ * One entry per image file. When several slots share an image (for example an
+ * expertise area using the clinic photograph), the first slot keeps its caption
+ * and group, and gains the other slots' pages.
+ */
+const unique = slots.reduce<Omit<GalleryEntry, 'no'>[]>((list, slot) => {
+  const existing = list.find((e) => e.src === slot.src)
+  if (!existing) return [...list, { ...slot, appearsOn: [...slot.appearsOn] }]
+  for (const p of slot.appearsOn) if (!existing.appearsOn.some((q) => q.path === p.path)) existing.appearsOn.push(p)
+  return list
+}, [])
+
+export const gallery: GalleryEntry[] = unique.map((e, i) => ({ ...e, no: i + 1 }))
 
 export const galleryId = (no: number) => `gallery-${String(no).padStart(2, '0')}`
