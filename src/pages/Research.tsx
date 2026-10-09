@@ -28,7 +28,7 @@ export default function Research() {
     <>
       <Opening />
       <Frontispiece />
-      {groups.length > 0 && <VerificationStatus />}
+      {groups.length > 0 && <ResearchSummary />}
       <Bibliography />
       <BookingPrompt />
     </>
@@ -120,27 +120,27 @@ function Frontispiece() {
   )
 }
 
-/* ── 3. Verification status: a count of entries by category, once any exist ── */
+/* ── 3. Research summary: a count of entries by category, once any exist ──── */
 
-function VerificationStatus() {
+function ResearchSummary() {
   const animated = useDecorativeMotion()
-  const rows = groups.map((g) => ({ category: g.category, verified: g.items.length }))
-  const total = rows.reduce((sum, r) => sum + r.verified, 0)
-  const max = Math.max(1, ...rows.map((r) => r.verified))
+  const rows = groups.map((g) => ({ category: g.category, count: g.items.length }))
+  const total = rows.reduce((sum, r) => sum + r.count, 0)
+  const max = Math.max(1, ...rows.map((r) => r.count))
 
   return (
-    <section aria-label="Verification status" className="container-page pb-4">
+    <section aria-label="Research summary" className="container-page pb-4">
       <div className="border-y border-line py-5">
         <>
             <p className="text-muted">
-              <Counter value={total} className="font-serif text-lg text-brass" /> verified {total === 1 ? 'entry' : 'entries'}
+              <Counter value={total} className="font-serif text-lg text-brass" /> research {total === 1 ? 'entry' : 'entries'}
             </p>
             <table className="mt-4 w-full border-collapse text-left">
-              <caption className="sr-only">Verified research entries by category</caption>
+              <caption className="sr-only">Research entries by category</caption>
               <thead className="sr-only">
                 <tr>
                   <th scope="col">Category</th>
-                  <th scope="col">Verified entries</th>
+                  <th scope="col">Entries</th>
                 </tr>
               </thead>
               <tbody>
@@ -153,7 +153,7 @@ function VerificationStatus() {
                       <span className="absolute inset-x-0 top-1/2 h-px bg-line-strong" />
                       <motion.span
                         className="absolute inset-y-0 left-0 origin-left rounded-sm bg-accent"
-                        style={{ width: `${(r.verified / max) * 100}%` }}
+                        style={{ width: `${(r.count / max) * 100}%` }}
                         initial={animated ? { scaleX: 0 } : false}
                         whileInView={{ scaleX: 1 }}
                         viewport={ONCE}
@@ -161,7 +161,7 @@ function VerificationStatus() {
                       />
                     </td>
                     <td className="text-right font-serif text-lg text-brass">
-                      <Counter value={r.verified} />
+                      <Counter value={r.count} />
                     </td>
                   </tr>
                 ))}

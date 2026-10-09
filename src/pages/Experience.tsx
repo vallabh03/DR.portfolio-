@@ -22,7 +22,7 @@ const credentialGroups = doctor.credentials
 /**
  * Experience: a formal professional record. The dates drive the composition:
  * a chronology whose sticky year rolls to the entry being read, followed by a
- * typographic register of verified credentials.
+ * typographic register of professional credentials.
  */
 export default function Experience() {
   return (
@@ -46,7 +46,7 @@ function Opening() {
           <RevealText as="h1" id="experience-title" lines={['Track record']} className="display-hero" delay={0.1} immediate />
         </div>
         <motion.p className="lead measure lg:col-span-5 lg:self-end lg:pb-3" {...entrance(0.4)}>
-          A timeline of clinical roles and training, followed by verified qualifications, certifications and memberships.
+          A timeline of clinical roles and training, followed by qualifications and memberships.
         </motion.p>
       </div>
       <DrawLine immediate delay={0.5} duration={1.2} className="mt-12 bg-line-strong md:mt-16" />
@@ -122,11 +122,18 @@ function StickyYear({ year, index, count, direction }: { year: string; index: nu
     exit: (d: number) => (animated ? { y: d > 0 ? '-100%' : '100%', transition: { duration: 0.3, ease: EASE_EXIT } } : { opacity: 0, transition: { duration: 0 } }),
   }
 
+  // A single year is set as display type; a longer period steps down in size and may wrap.
+  const period = year.length > 4
+
   return (
     <div className="sticky top-32">
-      <div className="relative h-[1.1em] overflow-hidden font-serif text-[clamp(3.5rem,2rem+3.4vw,6rem)] leading-[1.1] tracking-[-0.02em] text-brass">
+      <div
+        className={`relative overflow-hidden font-serif leading-[1.1] tracking-[-0.02em] text-brass ${
+          period ? 'text-[clamp(2rem,1.2rem+1.6vw,3rem)]' : 'h-[1.1em] text-[clamp(3.5rem,2rem+3.4vw,6rem)]'
+        }`}
+      >
         <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-          <motion.span key={index} className="block whitespace-nowrap" custom={direction} variants={roll} initial="enter" animate="center" exit="exit">
+          <motion.span key={index} className={`block ${period ? '' : 'whitespace-nowrap'}`} custom={direction} variants={roll} initial="enter" animate="center" exit="exit">
             {year}
           </motion.span>
         </AnimatePresence>
@@ -175,7 +182,7 @@ function Entry({ index, state, year, role, institution, location, description, h
       <Marker state={state} />
       <article aria-labelledby={`${entryId(index)}-title`} className="min-w-0">
         {/* Year: inline below desktop; on desktop it is carried by the sticky indicator and kept for screen readers */}
-        {hasValue(year) && <p className="font-serif text-[clamp(2rem,1.6rem+1.6vw,2.5rem)] leading-none tabular-nums text-brass lg:sr-only">{year}</p>}
+        {hasValue(year) && <p className="font-serif text-[clamp(2rem,1.6rem+1.6vw,2.5rem)] leading-[1.1] tabular-nums text-brass lg:sr-only">{year}</p>}
         <h3 id={`${entryId(index)}-title`} className="mt-3 font-serif text-[clamp(1.75rem,1.45rem+1.2vw,2.5rem)] leading-[1.1] tracking-[-0.015em] lg:mt-0">
           {role}
         </h3>
@@ -196,7 +203,7 @@ function Entry({ index, state, year, role, institution, location, description, h
   )
 }
 
-/* ── 3. Verified credentials: a typographic register ─────────────────────── */
+/* ── 3. Professional credentials: a typographic register ─────────────────── */
 
 function Credentials() {
   const animated = useDecorativeMotion()
@@ -217,10 +224,9 @@ function Credentials() {
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
           {/* Heading, introduction and the credential image */}
           <div className="lg:col-span-4">
-            <RevealText as="h2" id="credentials-title" lines={['Verified credentials']} className="heading-2" />
+            <RevealText as="h2" id="credentials-title" lines={['Professional credentials']} className="heading-2" />
             <p className="lead measure mt-6">
-              Qualifications, specialised training, certifications and professional memberships. Each entry is published only
-              after it has been verified.
+              Qualifications, specialised training and professional memberships.
             </p>
             <MedicalImage
               src="/images/credential-01.jpg"
@@ -274,10 +280,10 @@ function Credentials() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, transition: { duration: animated ? 0.15 : 0, ease: EASE_EXIT } }}
                       transition={{ duration: 0.4, ease: EASE }}
-                      className="group grid gap-x-8 gap-y-2 border-b border-line py-6 sm:grid-cols-[5rem_1fr] lg:grid-cols-[5rem_1fr_13rem]"
+                      className="group grid gap-x-8 gap-y-2 border-b border-line py-6 sm:grid-cols-[9rem_1fr] lg:grid-cols-[9rem_1fr_13rem]"
                     >
                       {/* The year column keeps its place for alignment, empty when no year is given */}
-                      <span className="font-serif text-lg tabular-nums text-brass">{hasValue(c.year) ? c.year : null}</span>
+                      <span className="font-serif text-lg leading-snug tabular-nums text-brass">{hasValue(c.year) ? c.year : null}</span>
                       <div className="min-w-0">
                         <h3 className="font-serif text-[1.375rem] leading-snug transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">
                           {c.title}

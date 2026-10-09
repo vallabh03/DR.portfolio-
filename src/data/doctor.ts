@@ -26,7 +26,7 @@ export type TimelineItem = {
 
 export type Credential = {
   title: string
-  institution: string
+  institution?: string
   year?: string
   description?: string
   link?: string
@@ -114,8 +114,6 @@ export type Doctor = {
     journey: string
     philosophy: string
     patientCentered: string
-    education: string[]
-    training: string[]
     experience: string[]
     languages: string[]
   }
@@ -132,111 +130,122 @@ export type Doctor = {
   seo: { siteUrl: string }
 }
 
+/** Credential categories that the About page also lists as Education and Training. */
+export const QUALIFICATIONS = 'Medical Qualifications'
+export const TRAINING = 'Specialized Training'
+
 export const doctor: Doctor = {
-  name: 'Dr. Abhinav Thaduri',
-  firstLine: 'Dr. Abhinav',
+  name: 'Dr Abhinav Thaduri',
+  firstLine: 'Dr Abhinav',
   lastLine: 'Thaduri',
   initials: 'AT',
-  title: '[VERIFY SPECIALTY]',
+  title: 'Consultant Head and Neck Surgical Oncologist',
+  specialty: 'Head and Neck Surgical Oncology',
+  qualifications: 'MBBS, MS (ORL-HNS), M.Ch (Head & Neck Surgery & Oncology)',
 
-  // Not yet filled in: each waits for confirmed wording from the doctor.
-  // specialty, qualifications, headline, headlineSupport, bioShort, approachStatement: strings
-  // bioFull: one string per paragraph
+  headline: 'Specialist surgical care for head and neck cancer',
+  headlineSupport:
+    'Assessment, treatment planning and surgery for oral, thyroid, salivary gland and laryngeal cancers, with attention to functional recovery and life after treatment.',
+
+  bioShort:
+    'Dr Abhinav Thaduri is an AIIMS-trained Head & Neck Surgical Oncologist practising at Continental Hospitals, Hyderabad. His clinical work focuses on oral cancer, thyroid and parathyroid surgery, salivary gland tumours, and cancers of the larynx and hypopharynx. His academic interests include cancer outcomes, speech and swallowing after treatment, and the long-term wellbeing of patients and families.',
+
+  approachStatement:
+    'My approach begins with understanding the disease and the person facing it. I explain the diagnosis, available treatment options and expected effects on everyday life so that patients and families can make informed decisions. Treatment planning considers cancer control alongside balancing the quality of life. Where needed, I work with colleagues in radiation oncology, medical oncology, reconstruction and rehabilitation to coordinate care through treatment and follow-up.',
+
+  // Not yet filled in: each waits for the doctor's confirmation.
+  // bioFull: one string per paragraph (full biography)
   // registration: { body, number, show }
   bioFull: [],
 
   about: {
-    journey:
-      '[PROFESSIONAL JOURNEY] — The path through medical school, residency and clinical practice, supplied and verified by Dr. Thaduri.',
-    philosophy:
-      '[CLINICAL PHILOSOPHY] — The principles that guide clinical decisions, in Dr. Thaduri’s own words.',
-    patientCentered:
-      '[PATIENT-CENTERED APPROACH] — How patients and families are involved in understanding their condition and their options.',
-    education: ['[EDUCATION]'],
-    training: ['[TRAINING]'],
+    // Professional journey: empty until the doctor supplies the text; the chapter is hidden while empty.
+    journey: '',
+    philosophy: '',
+    patientCentered: '',
     experience: ['[PROFESSIONAL EXPERIENCE]'],
     languages: ['[LANGUAGES SPOKEN]'],
   },
 
   experience: [
     {
-      year: '[YEAR]',
-      role: '[POSITION]',
-      institution: '[INSTITUTION]',
-      location: '[CITY]',
-      description: '[DESCRIPTION OF ROLE AND RESPONSIBILITIES]',
-      highlights: ['[KEY RESPONSIBILITY]', '[KEY RESPONSIBILITY]'],
+      year: '2026–present',
+      role: 'Consultant Head and Neck Surgical Oncologist',
+      institution: 'Continental Hospitals',
+      location: 'Hyderabad',
+      description:
+        'Clinical focus: assessment and surgical management of head and neck cancers, thyroid and salivary gland surgery, treatment planning, and follow-up.',
     },
     {
-      year: '[YEAR]',
-      role: '[POSITION]',
-      institution: '[INSTITUTION]',
-      location: '[CITY]',
-      description: '[DESCRIPTION OF ROLE AND RESPONSIBILITIES]',
-      highlights: ['[KEY RESPONSIBILITY]', '[KEY RESPONSIBILITY]'],
+      year: 'November 2023–August 2026',
+      role: 'Consultant Head and Neck Surgical Oncologist',
+      institution: 'Basavatarakam Indo American Cancer Hospital & Research Institute',
+      location: 'Hyderabad',
+      description:
+        'Comprehensive head and neck cancer management, oral cancer surgery and neck dissections, thyroid and salivary gland surgery, reconstructive planning, rehabilitation, tumour board participation, clinical research and academic activities.',
     },
     {
-      year: '[YEAR]',
-      role: '[POSITION]',
-      institution: '[INSTITUTION]',
-      location: '[CITY]',
-      description: '[DESCRIPTION OF ROLE AND RESPONSIBILITIES]',
-      highlights: ['[KEY RESPONSIBILITY]', '[KEY RESPONSIBILITY]'],
+      year: 'September 2022–November 2023',
+      role: 'Consultant and Assistant Professor in ENT',
+      institution: 'Prathima Cancer Institute and Prathima Relief Medical College',
+      location: 'Warangal',
+      description:
+        'Head and neck surgical oncology practice and postgraduate / undergraduate teaching in otolaryngology.',
     },
   ],
 
+  // Awards, academic achievements and registration are added separately, once confirmed.
   credentials: [
     {
-      category: 'Medical Qualifications',
+      category: QUALIFICATIONS,
       items: [
-        { title: '[DEGREE]', institution: '[INSTITUTION]', year: '[YEAR]', description: '[DESCRIPTION]' },
-        { title: '[DEGREE]', institution: '[INSTITUTION]', year: '[YEAR]', description: '[DESCRIPTION]' },
+        { title: 'M.Ch Head & Neck Surgery and Oncology', institution: 'AIIMS Rishikesh', year: '2019–2022' },
+        { title: 'MS Otorhinolaryngology and Head & Neck Surgery', institution: 'Gandhi Medical College, Hyderabad', year: '2015–2018' },
+        { title: 'MBBS', institution: 'Bhaskar Medical College, Hyderabad', year: '2008–2014' },
       ],
     },
     {
-      category: 'Specialized Training',
-      items: [{ title: '[TRAINING / FELLOWSHIP]', institution: '[INSTITUTION]', year: '[YEAR]', description: '[DESCRIPTION]' }],
-    },
-    {
-      category: 'Certifications',
-      items: [{ title: '[CERTIFICATION]', institution: '[CERTIFYING BODY]', year: '[YEAR]', description: '[DESCRIPTION]' }],
+      category: TRAINING,
+      items: [
+        { title: 'Fellowship in Head and Neck Oncology', institution: 'Basavatarakam Indo American Cancer Hospital & Research Institute, Hyderabad', year: 'February–August 2019' },
+        { title: 'Visiting Head and Neck Surgery Fellow', institution: 'University of Brescia, Italy', year: 'December 2022–January 2023', description: 'Exposure to head and neck oncology, minimally invasive laryngeal surgery and multidisciplinary cancer care.' },
+      ],
     },
     {
       category: 'Professional Memberships',
-      items: [{ title: '[MEMBERSHIP]', institution: '[ORGANISATION]', year: '[YEAR]', description: '[DESCRIPTION]' }],
+      items: [
+        { title: 'American Society of Clinical Oncology (ASCO)' },
+        { title: 'European Society for Medical Oncology (ESMO)' },
+        { title: 'Indian Association of Surgical Oncology (IASO)' },
+        { title: 'Foundation for Head and Neck Oncology (FHNO)' },
+        { title: 'Association of Otorhinolaryngologists of India (AOI)' },
+        { title: 'Association of Otorhinolaryngologists of Telangana' },
+      ],
     },
-    {
-      category: 'Awards',
-      items: [{ title: '[AWARD]', institution: '[AWARDING BODY]', year: '[YEAR]', description: '[DESCRIPTION]' }],
-    },
-    {
-      category: 'Academic Achievements',
-      items: [{ title: '[ACHIEVEMENT]', institution: '[INSTITUTION]', year: '[YEAR]', description: '[DESCRIPTION]' }],
-    },
-  ] as CredentialGroup[],
+  ],
 
   expertise: [
     {
       title: '[EXPERTISE]',
-      description: '[SHORT DESCRIPTION OF THIS AREA OF CARE — VERIFIED ONLY]',
+      description: '',
       details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
       image: '/images/expertise-01.jpg',
     },
     {
       title: '[EXPERTISE]',
-      description: '[SHORT DESCRIPTION OF THIS AREA OF CARE — VERIFIED ONLY]',
+      description: '',
       details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
       image: '/images/expertise-02.jpg',
     },
     {
       title: '[EXPERTISE]',
-      description: '[SHORT DESCRIPTION OF THIS AREA OF CARE — VERIFIED ONLY]',
+      description: '',
       details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
       image: '/images/expertise-03.jpg',
     },
     {
       title: '[EXPERTISE]',
-      description: '[SHORT DESCRIPTION OF THIS AREA OF CARE — VERIFIED ONLY]',
+      description: '',
       details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
       image: '/images/clinic.jpg',
     },
@@ -281,7 +290,7 @@ export const doctor: Doctor = {
   testimonials: [] as Testimonial[],
 
   contact: {
-    clinic: '[CLINIC / HOSPITAL NAME]',
+    clinic: 'Continental Hospitals, Hyderabad',
     addressLine: '[STREET ADDRESS]',
     locality: '[CITY, STATE, COUNTRY]',
     postcode: '[POSTCODE]',

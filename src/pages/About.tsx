@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react'
 import { Link } from 'react-router'
-import { aboutHeading, doctor, hasValue, publishable } from '../data/doctor'
+import { aboutHeading, doctor, hasValue, publishable, QUALIFICATIONS, TRAINING } from '../data/doctor'
 import { EASE, EASE_EXIT, EASE_IN_OUT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import { useScrollTrack } from '../hooks/useScrollTrack'
 import RevealText from '../components/RevealText'
@@ -257,12 +257,18 @@ function ChapterHead({ n, id, title }: { n: number; id: string; title: string })
 
 function FactFile() {
   const { about } = doctor
+  // Education and training come from the same entries as the credentials on the Experience page.
+  const fromCredentials = (category: string) =>
+    (doctor.credentials.find((g) => g.category === category)?.items ?? [])
+      .filter((c) => hasValue(c.title))
+      .map((c) => ({ title: c.title, detail: [c.institution, c.year].filter(hasValue).join(', ') }))
+  const plain = (values: string[]) => publishable(values).map((title) => ({ title, detail: '' }))
   // Rows with no confirmed entries are left out; the section is hidden if none remain.
   const rows = [
-    { title: 'Education', items: publishable(about.education) },
-    { title: 'Training', items: publishable(about.training) },
-    { title: 'Experience', items: publishable(about.experience) },
-    { title: 'Languages', items: publishable(about.languages) },
+    { title: 'Education', items: fromCredentials(QUALIFICATIONS) },
+    { title: 'Training', items: fromCredentials(TRAINING) },
+    { title: 'Experience', items: plain(about.experience) },
+    { title: 'Languages', items: plain(about.languages) },
   ].filter((r) => r.items.length > 0)
   if (rows.length === 0) return null
 
@@ -284,10 +290,11 @@ function FactFile() {
                 <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={i * 0.1} duration={1} />
                 <dt className="text-muted">{r.title}</dt>
                 <dd>
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-3">
                     {r.items.map((item, j) => (
-                      <li key={j} className="text-lg">
-                        {item}
+                      <li key={j}>
+                        <span className="block text-lg">{item.title}</span>
+                        {item.detail && <span className="mt-0.5 block text-sm text-muted">{item.detail}</span>}
                       </li>
                     ))}
                   </ul>

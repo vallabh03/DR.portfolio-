@@ -57,6 +57,7 @@ function Hero() {
             {/* Supporting copy settles as one group once the name has landed */}
             <motion.div {...entrance(0.7)}>
               {hasValue(doctor.title) && <p className="mt-6 text-lg text-fg">{doctor.title}</p>}
+              {hasValue(doctor.qualifications) && <p className="mt-1.5 text-sm text-muted">{doctor.qualifications}</p>}
               {hasValue(doctor.headline) && (
                 <>
                   <span aria-hidden className="mt-8 block h-px w-24 bg-accent" />

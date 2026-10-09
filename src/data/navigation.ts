@@ -17,7 +17,7 @@ export const navRoutes: NavRoute[] = [
   { path: '/', label: 'Home', title: 'Home', blurb: '' },
   { path: '/about', label: 'About', title: 'About', blurb: 'Background, philosophy and approach to care.' },
   { path: '/expertise', label: 'Expertise', title: 'Expertise', blurb: 'Areas of clinical focus.' },
-  { path: '/experience', label: 'Experience', title: 'Experience', blurb: 'Clinical roles, training and verified credentials.' },
+  { path: '/experience', label: 'Experience', title: 'Experience', blurb: 'Clinical roles, training and professional credentials.' },
   { path: '/research', label: 'Research', title: 'Research', blurb: 'Publications, studies and academic work.' },
   { path: '/gallery', label: 'Gallery', title: 'Gallery', blurb: 'Photographs used across this website.' },
   { path: '/contact', label: 'Contact', title: 'Contact', blurb: 'Where to find the practice and how to get in touch.' },
