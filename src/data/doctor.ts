@@ -277,7 +277,8 @@ export const doctor: Doctor = {
    */
   approach: [],
 
-  // researchIntro: the Research page introduction (not yet filled in)
+  researchIntro:
+    'Dr Thaduri’s research focuses on practical questions in head and neck cancer care: how disease extent and lymph node involvement influence outcomes, how treatment affects speech and swallowing, and how patients and families experience life after cancer. His work includes clinical outcomes research, patient-reported outcomes and studies of financial and psychological burden.',
   researchInterests: ['[RESEARCH INTEREST]', '[RESEARCH INTEREST]', '[RESEARCH INTEREST]'],
 
   research: [
@@ -316,7 +317,7 @@ export const doctor: Doctor = {
     postcode: '[POSTCODE]',
     phone: '',
     email: '',
-    hours: [{ days: '[DAYS]', time: '[HOURS]' }],
+    hours: [{ days: 'Monday–Saturday', time: '9 AM–5 PM' }],
     mapUrl: '',
     links: [],
   },
