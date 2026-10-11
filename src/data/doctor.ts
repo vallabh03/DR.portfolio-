@@ -332,7 +332,7 @@ export const doctor: Doctor = {
   },
 
   seo: {
-    siteUrl: 'https://www.example.com',
+    siteUrl: 'https://www.drabhinavthaduri.com',
   },
 }
 
