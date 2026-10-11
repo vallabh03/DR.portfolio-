@@ -42,6 +42,8 @@ export type ExpertiseItem = {
   description: string
   /** Conditions and procedures; the list is hidden when empty. */
   details?: string[]
+  /** Heading for the details list, when the doctor labels it differently (default: "Conditions and procedures"). */
+  detailsLabel?: string
   /** Illustrative image in /public/images; the area works without one. */
   image?: string
 }
@@ -224,32 +226,50 @@ export const doctor: Doctor = {
     },
   ],
 
+  // Areas of expertise as supplied by the doctor. No images have been approved yet.
   expertise: [
     {
-      title: '[EXPERTISE]',
-      description: '',
-      details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
-      image: '/images/expertise-01.jpg',
+      title: 'Oral cancer surgery',
+      description:
+        'Assessment and surgical treatment of cancers affecting the tongue, inner cheek, gums, floor of the mouth and other oral cavity sites. Surgical planning addresses tumour removal, neck lymph nodes and reconstruction.',
     },
     {
-      title: '[EXPERTISE]',
-      description: '',
-      details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
-      image: '/images/expertise-02.jpg',
+      title: 'Thyroid and parathyroid surgery',
+      description:
+        'Evaluation and surgical management of thyroid and parathyroid conditions, with the extent of surgery tailored to the diagnosis and clinical findings.',
     },
     {
-      title: '[EXPERTISE]',
-      description: '',
-      details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
-      image: '/images/expertise-03.jpg',
+      title: 'Salivary gland tumours',
+      description:
+        'Assessment and surgery for benign and malignant tumours of the parotid, submandibular and other salivary glands, with attention to tumour clearance and relevant nerve function.',
     },
     {
-      title: '[EXPERTISE]',
-      description: '',
-      details: ['[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]', '[CONDITION / PROCEDURE]'],
-      image: '/images/clinic.jpg',
+      title: 'Laryngeal and hypopharyngeal cancers',
+      description:
+        'Assessment and surgical care for cancers of the voice box and lower throat. Treatment discussions include cancer control and the expected effects on voice, swallowing and breathing.',
     },
-  ] as ExpertiseItem[],
+    {
+      title: 'Head and neck reconstruction',
+      description:
+        'Reconstructive planning following cancer surgery to restore tissue coverage and support oral function, swallowing and recovery.',
+    },
+    {
+      title: 'Survivorship and functional recovery',
+      description:
+        'Follow-up that considers recovery beyond the operation, including speech, swallowing, nutrition, return to daily activities and the needs of caregivers.',
+      details: [
+        'Post-treatment follow-up',
+        'assessment of functional concerns',
+        'coordination with speech and swallowing therapy, nutrition and rehabilitation services',
+      ],
+      detailsLabel: 'Scope',
+    },
+    {
+      title: 'Second opinions and treatment planning',
+      description:
+        'Review of an established diagnosis or proposed treatment plan, with discussion of available options and their likely implications. Bring biopsy reports, scans and previous treatment records to the consultation.',
+    },
+  ],
 
   /**
    * The stages of a consultation, only in wording supplied and approved by the
@@ -257,7 +277,8 @@ export const doctor: Doctor = {
    */
   approach: [],
 
-  // researchIntro: the Research page introduction (not yet filled in)
+  researchIntro:
+    'Dr Thaduri’s research focuses on practical questions in head and neck cancer care: how disease extent and lymph node involvement influence outcomes, how treatment affects speech and swallowing, and how patients and families experience life after cancer. His work includes clinical outcomes research, patient-reported outcomes and studies of financial and psychological burden.',
   researchInterests: ['[RESEARCH INTEREST]', '[RESEARCH INTEREST]', '[RESEARCH INTEREST]'],
 
   research: [
@@ -296,7 +317,7 @@ export const doctor: Doctor = {
     postcode: '[POSTCODE]',
     phone: '',
     email: '',
-    hours: [{ days: '[DAYS]', time: '[HOURS]' }],
+    hours: [{ days: 'Monday–Saturday', time: '9 AM–5 PM' }],
     mapUrl: '',
     links: [],
   },
