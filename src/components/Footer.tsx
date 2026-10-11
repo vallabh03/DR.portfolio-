@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router'
 import { doctor, hasValue } from '../data/doctor'
 import { BOOK_PATH, BOOK_TITLE, navRoutes } from '../data/navigation'
 import LegalDialog, { LEGAL_TITLES, publishedLegalDocs, type LegalDoc } from './LegalDialog'
+import CookieBanner from './CookieBanner'
 import { ArrowRight, ArrowUp } from './Button'
 
 /** Editorial footer shared by every page. */
@@ -95,6 +96,7 @@ export default function Footer() {
       </div>
 
       <LegalDialog doc={legal} onClose={() => setLegal(null)} />
+      <CookieBanner onOpenPrivacy={() => setLegal('privacy')} />
     </footer>
   )
 }

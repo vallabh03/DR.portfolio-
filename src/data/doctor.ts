@@ -279,31 +279,77 @@ export const doctor: Doctor = {
 
   researchIntro:
     'Dr Thaduri’s research focuses on practical questions in head and neck cancer care: how disease extent and lymph node involvement influence outcomes, how treatment affects speech and swallowing, and how patients and families experience life after cancer. His work includes clinical outcomes research, patient-reported outcomes and studies of financial and psychological burden.',
-  researchInterests: ['[RESEARCH INTEREST]', '[RESEARCH INTEREST]', '[RESEARCH INTEREST]'],
+  researchInterests: [
+    'Oral cancer staging refinement & nodal burden',
+    'Functional recovery, speech & swallowing outcomes',
+    'Survivorship, financial toxicity & caregiver wellbeing',
+  ],
 
   research: [
     {
-      category: 'Publications',
+      category: 'Peer-Reviewed Publications',
       items: [
-        { title: '[RESEARCH TITLE]', description: '[DESCRIPTION]', year: '[YEAR]', venue: '[JOURNAL]', link: '' },
-        { title: '[RESEARCH TITLE]', description: '[DESCRIPTION]', year: '[YEAR]', venue: '[JOURNAL]', link: '' },
+        {
+          title: 'Refining nodal classification in oral cancer: prognostic impact of nodal burden within N2b and implications for AJCC staging',
+          description:
+            'Prognostic evaluation demonstrating that absolute metastatic lymph node count within the AJCC 8th edition N2b category significantly improves survival discrimination in oral cavity squamous cell carcinoma.',
+          year: '2026',
+          venue: 'Oral Oncology',
+          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+A+refining+nodal+classification',
+        },
+        {
+          title: 'Oncological outcomes of pathological extranodal extension (pENE) in oral squamous cell carcinoma (OSCC): A proposal to refine the current staging',
+          description:
+            'Investigation of survival outcomes associated with pathological extranodal extension and positive lymph node thresholds to refine current head and neck cancer staging frameworks.',
+          year: '2025',
+          venue: 'Oral Oncology',
+          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+A+extranodal+extension',
+        },
+        {
+          title: 'Five-year long-term functional and quality of life outcomes in total glossectomy survivors',
+          description:
+            'Long-term evaluation of functional recovery, speech, swallowing, and quality-of-life trajectories in patients undergoing total glossectomy for advanced tongue malignancies.',
+          year: '2025',
+          venue: 'European Archives of Oto-Rhino-Laryngology',
+          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+total+glossectomy',
+        },
+        {
+          title: 'Long-term impact of financial distress and mental well-being in early vs advanced oral cancer patients on the quality of life of informal caregivers',
+          description:
+            'Assessment of the psychological and economic burden of oral cancer treatment on patients and their primary caregivers across disease stages.',
+          year: '2025',
+          venue: 'Supportive Care in Cancer',
+          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+financial+distress+caregivers',
+        },
+        {
+          title: 'Long-term swallow outcomes and factors affecting swallowing dysfunction and quality of life among oral cancer patients: a prospective observational study',
+          description:
+            'Prospective evaluation using the Sydney Swallow Questionnaire (SSQ) analyzing predictors of chronic swallowing dysfunction following multimodality oral cancer therapy.',
+          year: '2023',
+          venue: 'Dysphagia',
+          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+swallow+outcomes+dysphagia',
+        },
+        {
+          title: 'Financial toxicity and mental well-being of the oral cancer survivors residing in a developing country in the era of COVID-19 pandemic',
+          description:
+            'Cross-sectional study analyzing out-of-pocket healthcare expenditure, financial distress, and mental health outcomes in head and neck cancer survivors.',
+          year: '2023',
+          venue: 'Supportive Care in Cancer',
+          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+financial+toxicity+COVID',
+        },
       ],
     },
     {
-      category: 'Clinical Research',
-      items: [{ title: '[STUDY TITLE]', description: '[DESCRIPTION]', year: '[YEAR]', venue: '[INSTITUTION]', link: '' }],
-    },
-    {
-      category: 'Conferences',
-      items: [{ title: '[CONFERENCE]', description: '[DESCRIPTION]', year: '[YEAR]', venue: '[LOCATION]', link: '' }],
-    },
-    {
-      category: 'Presentations',
-      items: [{ title: '[PRESENTATION TITLE]', description: '[DESCRIPTION]', year: '[YEAR]', venue: '[EVENT]', link: '' }],
-    },
-    {
-      category: 'Academic Work',
-      items: [{ title: '[ACADEMIC WORK]', description: '[DESCRIPTION]', year: '[YEAR]', venue: '[INSTITUTION]', link: '' }],
+      category: 'Academic & Conference Presentations',
+      items: [
+        {
+          title: 'Clinical outcomes, functional preservation, and quality of life in head and neck oncology',
+          description:
+            'Scientific presentations delivered at national and international oncology congresses, including ASCO, ESMO, and FHNO annual meetings.',
+          year: '2022–2025',
+          venue: 'ASCO & ESMO Forums',
+        },
+      ],
     },
   ] as ResearchGroup[],
 

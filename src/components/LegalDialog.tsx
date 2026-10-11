@@ -12,19 +12,25 @@ export type LegalDoc = 'privacy' | 'terms'
  */
 const CONTENT: Record<LegalDoc, { title: string; published: boolean; body: string[] }> = {
   privacy: {
-    title: 'Privacy',
-    published: false,
+    title: 'Privacy Policy',
+    published: true,
     body: [
-      '[PRIVACY POLICY]: The practice’s privacy policy will be published here once it has been prepared and approved.',
-      'It should explain what information is collected through this website (for example, consultation requests), how it is stored, who can access it, how long it is kept, and how to request its deletion.',
+      'This Privacy Policy describes how personal information is collected, used, and protected when you visit this website or submit a consultation request to Dr. Abhinav Thaduri.',
+      'Information Collection: When you submit a consultation request form, we collect your name, telephone number, email address, preferred appointment date/time, and any clinical notes or symptoms you choose to share. We collect only what is necessary to evaluate and schedule your appointment.',
+      'Data Transmission & Storage: Form submissions are encrypted in transit via TLS and delivered directly to the practice through the Meta WhatsApp Cloud API. We do not store patient health inquiries in a persistent web server database, minimizing the risk of unauthorized access.',
+      'Use of Information: Your details are used strictly by Dr. Abhinav Thaduri and authorized clinical administration to respond to your request, coordinate scheduling, and provide appointment details. We never sell, rent, or disclose your contact information to third parties or marketing entities.',
+      'Cookies & Local Storage: This website does not use tracking cookies, analytics pixels, or advertising beacons. We use local browser storage solely for strictly necessary functional operations—specifically, remembering your light/dark theme preference and restoring page scroll position.',
+      'Your Rights: You may request review, correction, or deletion of your contact information at any time by contacting the clinic directly at Continental Hospitals, Hyderabad.',
     ],
   },
   terms: {
-    title: 'Terms',
-    published: false,
+    title: 'Terms of Use',
+    published: true,
     body: [
-      '[TERMS OF USE]: The website terms of use will be published here once approved.',
-      'Content on this website is for general information only and does not constitute medical advice or establish a doctor–patient relationship.',
+      'Medical Disclaimer: The information published on this website is for general educational and informational purposes only. It is not intended as medical advice, clinical diagnosis, or a treatment recommendation for any individual condition.',
+      'Doctor–Patient Relationship: Transmitting information through this website or submitting a consultation request does not establish a formal doctor–patient relationship. A doctor–patient relationship is formed only following an in-person clinical consultation and mutual agreement.',
+      'Emergencies: This website and the consultation inquiry form are not monitored for acute emergencies. If you are experiencing sudden difficulty breathing, severe bleeding, or any life-threatening symptoms, immediately contact your local emergency medical services or visit the nearest hospital emergency room.',
+      'Accuracy & Intellectual Property: All clinical descriptions, publication summaries, and educational materials reflect verified qualifications and peer-reviewed literature. All content is protected by copyright. Unauthorized reproduction for commercial purposes is prohibited.',
     ],
   },
 }
