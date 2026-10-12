@@ -22,6 +22,8 @@ export type TimelineItem = {
   location?: string
   description?: string
   highlights?: string[]
+  /** The organisation's logo in /public/logos, shown above the entry when supplied. */
+  logo?: string
 }
 
 export type Credential = {
@@ -179,6 +181,7 @@ export const doctor: Doctor = {
       year: '2026–present',
       role: 'Consultant Head and Neck Surgical Oncologist',
       institution: 'Continental Hospitals',
+      logo: '/logos/continental-hospitals.png',
       location: 'Hyderabad',
       description:
         'Clinical focus: assessment and surgical management of head and neck cancers, thyroid and salivary gland surgery, treatment planning, and follow-up.',
@@ -187,6 +190,7 @@ export const doctor: Doctor = {
       year: 'November 2023–August 2026',
       role: 'Consultant Head and Neck Surgical Oncologist',
       institution: 'Basavatarakam Indo American Cancer Hospital & Research Institute',
+      logo: '/logos/basavatarakam.png',
       location: 'Hyderabad',
       description:
         'Comprehensive head and neck cancer management, oral cancer surgery and neck dissections, thyroid and salivary gland surgery, reconstructive planning, rehabilitation, tumour board participation, clinical research and academic activities.',
@@ -195,6 +199,7 @@ export const doctor: Doctor = {
       year: 'September 2022–November 2023',
       role: 'Consultant and Assistant Professor in ENT',
       institution: 'Prathima Cancer Institute and Prathima Relief Medical College',
+      logo: '/logos/prathima-cancer-institute.png',
       location: 'Warangal',
       description:
         'Head and neck surgical oncology practice and postgraduate / undergraduate teaching in otolaryngology.',
@@ -366,13 +371,14 @@ export const doctor: Doctor = {
 
   contact: {
     clinic: 'Continental Hospitals, Hyderabad',
-    addressLine: '[STREET ADDRESS]',
-    locality: '[CITY, STATE, COUNTRY]',
-    postcode: '[POSTCODE]',
+    addressLine: 'Plot No 3, Road No. 2, Financial District',
+    locality: 'Gachibowli, Nanakramguda, Telangana',
+    postcode: '500032',
     phone: '',
     email: '',
     hours: [{ days: 'Monday–Saturday', time: '9 AM–5 PM' }],
-    mapUrl: '',
+    // Opens the location in Google Maps (directions); the Contact page map loads only on request.
+    mapUrl: 'https://www.google.com/maps/search/?api=1&query=Continental+Hospitals%2C+Plot+No+3%2C+Road+No.+2%2C+Financial+District%2C+Gachibowli%2C+Nanakramguda%2C+Telangana+500032',
     links: [],
   },
 

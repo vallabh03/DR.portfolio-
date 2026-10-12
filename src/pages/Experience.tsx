@@ -3,13 +3,12 @@ import { motion, useScroll } from 'motion/react'
 import { doctor, hasValue, publishable } from '../data/doctor'
 import { useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
-import DrawLine from '../components/DrawLine'
 import CareerPath from '../components/CareerPath'
 
 const entryId = (i: number) => `record-${i + 1}`
 
-/** Roles that can be published: those with a confirmed position. */
-const roles = doctor.experience.filter((r) => hasValue(r.role))
+/** Roles that can be published, earliest first (the data lists the most recent first). */
+const roles = doctor.experience.filter((r) => hasValue(r.role)).reverse()
 
 /**
  * Experience: a formal professional record. The dates drive the composition:
@@ -25,21 +24,87 @@ export default function Experience() {
   )
 }
 
-/* ── 1. Opening ──────────────────────────────────────────────────────────── */
+/* ── 1. Opening: a soft blue hero with the record at a glance ─────────── */
+
+const pad = (n: number) => String(n).padStart(2, '0')
 
 function Opening() {
   const entrance = useEntrance()
+  const animated = useDecorativeMotion()
+  const current = roles.at(-1)
+  const since = roles[0]?.year.match(/\d{4}/)?.[0]
+  const facts = [
+    { value: pad(roles.length), label: roles.length === 1 ? 'Hospital' : 'Hospitals' },
+    ...(since ? [{ value: since, label: 'Clinical roles since' }] : []),
+    ...(current && /present/i.test(current.year) && hasValue(current.institution) ? [{ value: 'Now', label: `At ${current.institution}` }] : []),
+  ]
+  const logos = roles.filter((r) => hasValue(r.logo))
+
   return (
-    <section aria-labelledby="experience-title" className="container-page pt-10 md:pt-16 lg:pt-24">
-      <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
-        <div className="lg:col-span-7">
-          <RevealText as="h1" id="experience-title" lines={['Track record']} className="display-hero" delay={0.1} immediate />
-        </div>
-        <motion.p className="lead measure lg:col-span-5 lg:self-end lg:pb-3" {...entrance(0.4)}>
-          A timeline of clinical roles.
+    <section aria-labelledby="experience-title" className="relative overflow-hidden border-b border-line bg-surface">
+      {/* Faint contour lines in the corner, drawn once */}
+      <svg aria-hidden viewBox="0 0 600 600" className="pointer-events-none absolute -right-32 -top-24 hidden h-[36rem] w-[36rem] md:block">
+        {Array.from({ length: 9 }, (_, k) => (
+          <motion.ellipse
+            key={k}
+            cx={320 - k * 4}
+            cy={280 + k * 3}
+            rx={40 + k * 28}
+            ry={30 + k * 23}
+            transform="rotate(-16 300 300)"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="1"
+            initial={animated ? { pathLength: 0, opacity: 0 } : false}
+            animate={{ pathLength: 1, opacity: 0.18 - k * 0.015 }}
+            transition={{ duration: 1.6, ease: 'easeInOut', delay: 0.3 + k * 0.06 }}
+          />
+        ))}
+      </svg>
+
+      <div className="container-page relative pb-14 pt-12 md:pb-16 md:pt-16 lg:pb-20 lg:pt-24">
+        <motion.p {...entrance(0.05)} className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.16em] text-accent">
+          <span aria-hidden className="h-px w-10 bg-accent" />
+          Professional experience
         </motion.p>
+
+        <div className="mt-6 grid gap-10 lg:grid-cols-12 lg:items-end lg:gap-10">
+          <RevealText
+            as="h1"
+            id="experience-title"
+            lines={[<>Track <span className="text-accent">record</span></>]}
+            className="display-hero lg:col-span-7"
+            delay={0.15}
+            immediate
+          />
+
+          {/* The record at a glance */}
+          <motion.dl {...entrance(0.45)} className="grid grid-cols-3 gap-3 lg:col-span-5">
+            {facts.map((f) => (
+              <div key={f.label} className="rounded-2xl border border-line bg-bg p-4 sm:p-5">
+                <dt className="sr-only">{f.label}</dt>
+                <dd>
+                  <span className="block font-serif text-[clamp(1.75rem,1.4rem+1.2vw,2.5rem)] leading-none tabular-nums text-accent">{f.value}</span>
+                  <span aria-hidden className="mt-2 block text-xs leading-snug text-muted sm:text-sm">
+                    {f.label}
+                  </span>
+                </dd>
+              </div>
+            ))}
+          </motion.dl>
+        </div>
+
+        {/* The hospitals, as a row of logos */}
+        {logos.length > 0 && (
+          <motion.ul {...entrance(0.65)} aria-label="Hospitals" className="mt-10 flex flex-wrap items-center gap-3 md:mt-12">
+            {logos.map((r) => (
+              <li key={r.institution} className="flex h-16 items-center rounded-xl border border-line bg-white px-4 py-2">
+                <img src={r.logo} alt={r.institution} className="h-full w-auto max-w-[14rem] object-contain" />
+              </li>
+            ))}
+          </motion.ul>
+        )}
       </div>
-      <DrawLine immediate delay={0.5} duration={1.2} className="mt-12 bg-line-strong md:mt-16" />
     </section>
   )
 }
@@ -89,8 +154,8 @@ function Chronology() {
               active={active}
               onSelect={(i) => document.getElementById(entryId(i))?.scrollIntoView({ behavior: animated ? 'smooth' : 'auto', block: 'center' })}
               avatarSrc="/images/doctor-hero.jpg"
-              topLabel={/present/i.test(items[0].year) ? 'Now' : items[0].year.match(/\d{4}/)?.[0]}
-              bottomLabel={items.at(-1)!.year.match(/\d{4}/)?.[0]}
+              topLabel={items[0].year.match(/\d{4}/)?.[0]}
+              bottomLabel={/present/i.test(items.at(-1)!.year) ? 'Now' : items.at(-1)!.year.match(/\d{4}/g)?.at(-1)}
             />
           </div>
         </nav>
@@ -133,18 +198,30 @@ function Marker({ state }: { state: EntryState }) {
   )
 }
 
-function Entry({ index, state, year, role, institution, location, description, highlights }: { index: number; state: EntryState } & (typeof doctor.experience)[number]) {
-  const place = [institution, location].filter(hasValue).join(', ')
+function Entry({ index, state, year, role, institution, location, description, highlights, logo }: { index: number; state: EntryState } & (typeof doctor.experience)[number]) {
   const points = publishable(highlights)
   return (
     <li id={entryId(index)} className="relative grid grid-cols-[1.25rem_1fr] gap-x-6 pb-14 last:pb-0 sm:gap-x-10 md:pb-20 lg:min-h-[55vh]">
       <Marker state={state} />
       <article aria-labelledby={`${entryId(index)}-title`} className="min-w-0">
+        {/* The hospital's logo, on a white tile so it reads in both themes */}
+        {hasValue(logo) && (
+          <span className="mb-5 inline-flex h-16 items-center rounded-xl border border-line bg-white px-3 py-2">
+            <img src={logo} alt={`${institution} logo`} className="h-full w-auto max-w-[15rem] object-contain" loading="lazy" />
+          </span>
+        )}
         {hasValue(year) && <p className="font-serif text-[clamp(1.5rem,1.3rem+0.8vw,2rem)] leading-[1.1] tabular-nums text-brass">{year}</p>}
         <h3 id={`${entryId(index)}-title`} className="mt-3 font-serif text-[clamp(1.75rem,1.45rem+1.2vw,2.5rem)] leading-[1.1] tracking-[-0.015em]">
           {role}
         </h3>
-        {place && <p className="mt-2 text-muted">{place}</p>}
+        {/* The hospital, highlighted, with its city in a lighter tone */}
+        {(hasValue(institution) || hasValue(location)) && (
+          <p className="mt-3 text-lg leading-snug">
+            {hasValue(institution) && <span className="font-semibold text-accent">{institution}</span>}
+            {hasValue(institution) && hasValue(location) && <span className="text-muted">, </span>}
+            {hasValue(location) && <span className="text-muted">{location}</span>}
+          </p>
+        )}
         {hasValue(description) && <p className="measure mt-5 text-lg leading-[1.7] text-fg/90">{description}</p>}
         {points.length > 0 && (
           <ul className="measure mt-6 border-t border-line">
