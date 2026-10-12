@@ -6,7 +6,7 @@ import MedicalImage from '../components/MedicalImage'
 import DrawLine from '../components/DrawLine'
 import Counter from '../components/Counter'
 import { ArrowUpRight } from '../components/Button'
-import BookingPrompt from '../components/BookingPrompt'
+import CredentialsRegister from '../components/CredentialsRegister'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -30,7 +30,7 @@ export default function Research() {
       <Frontispiece />
       {groups.length > 0 && <ResearchSummary />}
       <Bibliography />
-      <BookingPrompt />
+      <CredentialsRegister />
     </>
   )
 }

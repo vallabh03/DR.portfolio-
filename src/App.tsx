@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
 import { Navigate, Route, Routes, useLocation, useNavigationType, type NavigationType } from 'react-router'
 import SiteHeader from './components/SiteHeader'
 import Footer from './components/Footer'
@@ -10,10 +10,11 @@ import Expertise from './pages/Expertise'
 import Experience from './pages/Experience'
 import Research from './pages/Research'
 import Gallery from './pages/Gallery'
+import GallerySectionPage from './pages/GallerySectionPage'
 import Contact from './pages/Contact'
 import Consultation from './pages/Consultation'
+import PageTransition from './components/PageTransition'
 import { BOOK_PATH, documentTitle, legacyRedirects } from './data/navigation'
-import { EASE_EXIT } from './lib/motion'
 
 /* ── Scroll positions per history entry, so Back/Forward return to where you were ── */
 const STORE = 'at-scroll'
@@ -100,13 +101,9 @@ export default function App() {
       </a>
       <SiteHeader />
       <main id="main" tabIndex={-1} className="focus:outline-none">
+        {/* Every pathname change runs the curtain transition (see PageTransition) */}
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: 0.3, ease: 'linear' } }}
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.22, ease: EASE_EXIT } }}
-          >
+          <PageTransition key={location.pathname}>
             <PageEnter locationKey={location.key} pathname={location.pathname} navType={navType} />
             <Routes location={location}>
               <Route path="/" element={<Home />} />
@@ -115,6 +112,7 @@ export default function App() {
               <Route path="/experience" element={<Experience />} />
               <Route path="/research" element={<Research />} />
               <Route path="/gallery" element={<Gallery />} />
+              <Route path="/gallery/:section" element={<GallerySectionPage />} />
               <Route path="/contact" element={<Contact />} />
               <Route path={BOOK_PATH} element={<Consultation />} />
               {Object.entries(legacyRedirects).map(([from, to]) => (
@@ -122,7 +120,7 @@ export default function App() {
               ))}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </motion.div>
+          </PageTransition>
         </AnimatePresence>
       </main>
       <Footer />

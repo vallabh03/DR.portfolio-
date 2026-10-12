@@ -1,302 +1,456 @@
-import { motion } from 'motion/react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Link } from 'react-router'
-import { doctor, hasValue, publishable, shortName } from '../data/doctor'
+import { doctor, hasValue, publishable, QUALIFICATIONS, shortName, TRAINING } from '../data/doctor'
 import { BOOK_PATH, showTestimonials } from '../data/navigation'
-import { useEntrance } from '../lib/motion'
-import RevealText from '../components/RevealText'
+import { EASE, EASE_EXIT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import MedicalImage from '../components/MedicalImage'
-import CropMarks from '../components/CropMarks'
-import GridLines from '../components/GridLines'
-import DrawLine from '../components/DrawLine'
-import Button, { ArrowRight } from '../components/Button'
+import { ArrowRight } from '../components/Button'
 import Testimonials from '../components/Testimonials'
-import BookingPrompt from '../components/BookingPrompt'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /**
- * Home: the page that sets the visual language for the whole site.
+ * Props for a section reveal: a short rise and fade, played once as the element
+ * scrolls into view. Under reduced motion it returns nothing, so content is simply there.
+ */
+function useReveal() {
+  const animated = useDecorativeMotion()
+  return (delay = 0, y = 24) =>
+    animated
+      ? { initial: { opacity: 0, y }, whileInView: { opacity: 1, y: 0 }, viewport: ONCE, transition: { duration: 0.8, ease: EASE, delay } }
+      : {}
+}
+
+/** Lists whose items arrive one after another as the list scrolls into view (items use ITEM). */
+const STAGGER = { hidden: {}, shown: { transition: { staggerChildren: 0.08 } } }
+const ITEM = { hidden: { opacity: 0, y: 20 }, shown: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } } }
+
+function useStagger() {
+  const animated = useDecorativeMotion()
+  return animated ? { variants: STAGGER, initial: 'hidden', whileInView: 'shown', viewport: ONCE } : {}
+}
+
+/** Cards lift slightly on hover; the shadow transition is CSS so it also works without JavaScript motion. */
+const LIFT = 'transition-[translate,box-shadow] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:shadow-[0_28px_50px_-26px_rgba(27,95,140,0.55)]'
+
+/**
+ * Home: soft clinical blue. A bold name set around the doctor's portrait, then
+ * an introduction, a tabbed record of clinical work, the approach statement,
+ * professional memberships and a booking invitation. Every value comes from
+ * doctor.ts; sections without confirmed content are left out. Colours are
+ * scoped to .home-blue in globals.css, so no other page changes.
  *
- * Motion budget (MASTER.md §5): the name reveal and the portrait opening are
- * the only primary motion. Everything else is supporting: a faint grid, crop
- * marks, and rules that draw once as they arrive. Body content is never faded
- * in on scroll; it is simply there.
+ * Motion: the name rises in, the portrait opens and its background shapes settle,
+ * then each section rises once as it scrolls into view, with list items arriving
+ * in sequence. The tab highlight slides between tabs and cards lift on hover. The
+ * cross tile's slow drift is the only continuous motion. Reduced motion shows
+ * everything in place, with no movement.
  */
 export default function Home() {
   return (
-    <>
+    <div className="home-blue">
       <Hero />
-      {(approachQuote || approachStages.length > 0) && <ApproachSpread />}
-      <FocusIndex />
-      <RecordSpread />
+      <Introduction />
+      <section aria-label="Clinical work and memberships">
+        {/* The pale band, with a rounded upper corner where it meets the white page */}
+        <div className="bg-[var(--b-band)] pb-16 pt-14 md:pb-24 md:pt-20 lg:rounded-tl-[4rem]">
+          <ClinicalWork />
+          <Approach />
+          <Memberships />
+        </div>
+      </section>
       {showTestimonials && <Testimonials />}
-      <BookingPrompt />
-    </>
+    </div>
   )
 }
 
-/* ── 1. Hero: masthead name, portrait in an arch, and the practice at a glance ── */
+/* ── Building blocks ─────────────────────────────────────────────────────── */
+
+const H2 = 'font-sans font-extrabold text-[clamp(2rem,1.5rem+2vw,3rem)] leading-[1.08] tracking-[-0.02em] text-[var(--b-blue)]'
+const CROSS = 'M16 6h8v10h10v8H24v10h-8V24H6v-8h10z'
+
+/** Pill button: solid blue for the primary action, outlined for the secondary one. */
+function PillButton({ to, solid, children }: { to: string; solid?: boolean; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className={`group/btn inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full border-2 px-6 text-[0.9375rem] font-semibold transition-colors duration-300 ${
+        solid
+          ? 'border-[var(--b-blue)] bg-[var(--b-blue)] text-[var(--b-on-blue)] hover:border-[var(--b-blue-hover)] hover:bg-[var(--b-blue-hover)]'
+          : 'border-[var(--b-blue)] text-[var(--b-blue)] hover:bg-[var(--b-blue)] hover:text-[var(--b-on-blue)]'
+      }`}
+    >
+      {children}
+    </Link>
+  )
+}
+
+function TextLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link to={to} className="group/btn inline-flex min-h-11 items-center gap-2 font-semibold text-[var(--b-blue)] hover:text-[var(--b-blue-hover)]">
+      <span className="link-underline">{children}</span>
+      <ArrowRight />
+    </Link>
+  )
+}
+
+/** A soft medical cross in a raised white tile: the page's one decorative icon. */
+function CrossTile() {
+  return (
+    <div aria-hidden className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--b-card)] shadow-[var(--b-shadow)]">
+      <svg viewBox="0 0 40 40" className="h-10 w-10">
+        <path d={CROSS} fill="var(--b-blue)" stroke="var(--b-blue)" strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
+
+/* ── 1. Hero: the name set around the portrait ───────────────────────────── */
+
 function Hero() {
+  const animated = useDecorativeMotion()
   const entrance = useEntrance()
-  // Only facts with a confirmed value are shown; the grid adapts to how many there are.
-  const facts = [
-    { k: 'Specialty', v: doctor.specialty },
-    { k: 'Practice', v: doctor.contact.clinic, link: { to: '/contact', label: 'Directions and hours' } },
-    { k: 'Languages', v: publishable(doctor.about.languages).join(', ') },
-  ].filter((f): f is typeof f & { v: string } => hasValue(f.v))
-  const factCols = ['', 'sm:grid-cols-1', 'sm:grid-cols-2', 'sm:grid-cols-3'][facts.length]
+  const rise = (delay: number) =>
+    animated ? { initial: { y: '0.35em', opacity: 0 }, animate: { y: 0, opacity: 1 }, transition: { duration: 0.8, ease: EASE, delay } } : {}
+  // Background pills glide in from the right edge; the shapes behind the portrait settle from slightly larger.
+  const glide = (delay: number, opacity = 1) =>
+    animated ? { initial: { x: 120, opacity: 0 }, animate: { x: 0, opacity }, transition: { duration: 1.4, ease: EASE, delay } } : {}
+  const settle = (delay: number, opacity = 1) =>
+    animated ? { initial: { scale: 0.85, opacity: 0 }, animate: { scale: 1, opacity }, transition: { duration: 1.2, ease: EASE, delay } } : {}
+  const NAME = 'font-sans font-black leading-[0.92] tracking-[-0.035em] text-[var(--b-blue)] text-[clamp(3.25rem,1.6rem+5.6vw,6.75rem)]'
 
   return (
-    <section aria-labelledby="home-title" className="relative isolate">
-      <GridLines delay={1.1} />
-      <div className="container-page pb-16 pt-10 md:pb-20 md:pt-16 lg:pt-20">
-        <div className="grid items-end gap-12 lg:grid-cols-12 lg:gap-10">
-          <div className="lg:col-span-7 lg:pb-4">
-            <RevealText as="h1" id="home-title" lines={[doctor.firstLine, doctor.lastLine]} className="display-hero" delay={0.1} immediate />
+    <section aria-labelledby="home-title" className="relative overflow-hidden">
+      {/* Soft background pills, decoration only */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <motion.span {...glide(0.2)} className="absolute -right-24 top-16 hidden h-28 w-[26rem] rounded-full bg-[var(--b-shape)] md:block" />
+        <motion.span {...glide(0.35, 0.7)} className="absolute -right-10 top-56 hidden h-28 w-[30rem] rounded-full bg-[var(--b-shape)] opacity-70 lg:block" />
+      </div>
 
-            {/* Supporting copy settles as one group once the name has landed */}
-            <motion.div {...entrance(0.7)}>
-              {hasValue(doctor.title) && <p className="mt-6 text-lg text-fg">{doctor.title}</p>}
-              {hasValue(doctor.qualifications) && <p className="mt-1.5 text-sm text-muted">{doctor.qualifications}</p>}
-              {hasValue(doctor.headline) && (
-                <>
-                  <span aria-hidden className="mt-8 block h-px w-24 bg-accent" />
-                  <p className="mt-8 max-w-xl font-serif text-[clamp(1.375rem,1.15rem+1vw,2rem)] leading-[1.3] tracking-[-0.01em] text-fg/85">
-                    {doctor.headline}
-                  </p>
-                  {hasValue(doctor.headlineSupport) && <p className="measure mt-4 text-fg/85">{doctor.headlineSupport}</p>}
-                </>
-              )}
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Button to={BOOK_PATH}>
-                  Book a consultation <ArrowRight />
-                </Button>
-                <Button to="/about" variant="secondary">
-                  About {shortName}
-                </Button>
-              </div>
+      <div className="container-page relative pb-14 pt-10 md:pb-20 md:pt-14 lg:pb-24">
+        {/* One heading for assistive technology; the two visual lines below are its presentation */}
+        <h1 id="home-title" tabIndex={-1} className="sr-only">
+          {doctor.name}
+        </h1>
+
+        <div className="grid items-center gap-y-8 lg:grid-cols-12 lg:gap-x-6 lg:gap-y-2">
+          {/* Line one: first name */}
+          <motion.p aria-hidden {...rise(0.1)} className={`${NAME} lg:col-span-8 lg:col-start-1 lg:row-start-1 lg:self-end lg:whitespace-nowrap`}>
+            {doctor.firstLine}
+          </motion.p>
+
+          {/* The portrait, beside both lines on wide screens */}
+          <div className="relative mx-auto w-full max-w-[22rem] sm:max-w-[26rem] lg:col-span-4 lg:col-start-9 lg:row-span-2 lg:row-start-1 lg:mr-4 lg:max-w-none">
+            <motion.span {...settle(0.5, 0.8)} aria-hidden className="absolute -bottom-6 -left-6 h-24 w-[70%] origin-left rounded-full bg-[var(--b-shape-2)] opacity-80" />
+            <motion.span {...settle(0.35)} aria-hidden className="absolute -right-5 top-10 h-[70%] w-[80%] origin-top-right rounded-[2.5rem] bg-[var(--b-shape)]" />
+            <MedicalImage
+              src="/images/doctor-hero.jpg"
+              sizes="(min-width: 1024px) 30vw, (min-width: 640px) 26rem, 90vw"
+              alt={`Portrait of ${doctor.name}`}
+              placeholderLabel="Portrait"
+              priority
+              hoverZoom={false}
+              delay={0.15}
+              className="relative aspect-[1104/1250] w-full rounded-[2rem] shadow-[var(--b-shadow)]"
+              imgClassName="object-top"
+            />
+            <motion.div {...entrance(0.9)} className="absolute -left-8 top-[38%] hidden sm:block lg:-left-10">
+              {/* A slow, small drift: the page's only continuous motion, off under reduced motion */}
+              <motion.div
+                animate={animated ? { y: [0, -8, 0] } : undefined}
+                transition={{ duration: 6, ease: 'easeInOut', repeat: Infinity, delay: 1.8 }}
+              >
+                <CrossTile />
+              </motion.div>
             </motion.div>
           </div>
 
-          <div className="lg:col-span-5">
-            <figure className="mx-auto w-full max-w-[24rem] lg:mr-0 lg:max-w-none">
-              <div className="relative">
-                <MedicalImage
-                  src="/images/doctor-hero.jpg"
-                  sizes="(min-width: 1024px) 38vw, min(24rem, 100vw)"
-                  alt={`Portrait of ${doctor.name}`}
-                  placeholderLabel="Portrait"
-                  priority
-                  hoverZoom={false}
-                  delay={0.2}
-                  className="aspect-[4/5] w-full rounded-b-lg rounded-t-full"
-                />
-                <CropMarks delay={1.4} />
+          {/* Line two: family name, then the title, practice and actions */}
+          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-2 lg:self-start lg:pl-[12%]">
+            <motion.p aria-hidden {...rise(0.25)} className={NAME}>
+              {doctor.lastLine}
+            </motion.p>
+            <motion.div {...entrance(0.6)} className="mt-6">
+              {hasValue(doctor.title) && <p className="text-[clamp(1.25rem,1.1rem+0.5vw,1.5rem)] font-bold leading-snug">{doctor.title}</p>}
+              {hasValue(doctor.contact.clinic) && <p className="mt-1 text-lg text-[var(--b-muted)]">{doctor.contact.clinic}</p>}
+              {hasValue(doctor.qualifications) && <p className="mt-3 text-sm font-medium text-[var(--b-muted)]">{doctor.qualifications}</p>}
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <PillButton to={BOOK_PATH} solid>
+                  Book a consultation <ArrowRight />
+                </PillButton>
+                <PillButton to="/about">About {shortName}</PillButton>
               </div>
-              {/* Editorial caption, as a publication would credit a portrait */}
-              <figcaption className="mt-5 flex items-baseline justify-between gap-4 text-sm text-muted">
-                <span>{doctor.name}</span>
-                {hasValue(doctor.contact.clinic) && <span className="text-right text-fg/80">{doctor.contact.clinic}</span>}
-              </figcaption>
-            </figure>
+            </motion.div>
           </div>
         </div>
-
-        {/* At a glance */}
-        <div className="mt-16 md:mt-20">
-          {/* The doctor's short biography, shown only once supplied */}
-          {hasValue(doctor.bioShort) && <p className="measure text-fg/85">{doctor.bioShort}</p>}
-          {facts.length > 0 && (
-            <div className={`relative ${hasValue(doctor.bioShort) ? 'mt-6' : ''}`}>
-              <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.2} />
-              <dl className={`grid ${factCols}`}>
-                {facts.map((f, i) => (
-                  <div key={f.k} className={`py-5 sm:py-7 ${i > 0 ? 'border-t border-line sm:border-l sm:border-t-0 sm:pl-6' : ''}`}>
-                    <dt className="label">{f.k}</dt>
-                    <dd className="mt-2">
-                      <span>{f.v}</span>
-                      {f.link && (
-                        <Link to={f.link.to} className="group/btn mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-accent hover:text-accent-hover">
-                          <span className="link-underline">{f.link.label}</span>
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.2} delay={0.15} />
-            </div>
-          )}
-        </div>
       </div>
     </section>
   )
 }
 
-/* ── 2. Approach: the philosophy as a pull quote, and the consultation stages as a drawn sequence ── */
+/* ── 2. Introduction ─────────────────────────────────────────────────────── */
 
-// The doctor's approach statement when supplied, otherwise the philosophy text. Each part is hidden when absent,
-// and the whole section when both are.
-const approachQuote = [doctor.approachStatement, doctor.about.philosophy].find(hasValue)
-const approachStages = doctor.approach.filter((s) => hasValue(s.title))
-
-function ApproachSpread() {
-  const quote = approachQuote
-  const stages = approachStages
+function Introduction() {
+  const facts = [
+    { k: 'Specialty', v: doctor.specialty },
+    { k: 'Practice', v: doctor.contact.clinic },
+    { k: 'Languages', v: publishable(doctor.about.languages).join(', ') },
+  ].filter((f) => hasValue(f.v))
+  const reveal = useReveal()
+  const stagger = useStagger()
+  if (!hasValue(doctor.headline) && !hasValue(doctor.bioShort)) return null
 
   return (
-    <section aria-labelledby="approach-title" className="border-y border-line bg-surface">
-      <div className="container-page section-y">
-        <div className="grid gap-10 lg:grid-cols-12">
-          <RevealText as="h2" id="approach-title" lines={['Approach to care']} className="heading-2 lg:col-span-4" />
-          {quote && (
-            <figure className="lg:col-span-8">
-              <blockquote className="font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.5rem)] leading-[1.3] tracking-[-0.01em]">{quote}</blockquote>
-              <figcaption className="mt-6 flex items-center gap-4 text-sm text-muted">
-                <DrawLine className="w-10 bg-brass" duration={0.7} />
-                Clinical philosophy, {doctor.name}
-              </figcaption>
-            </figure>
-          )}
-        </div>
+    <section aria-labelledby="intro-title" className="container-page pb-14 md:pb-20">
+      <div className="max-w-4xl">
+        <motion.h2 {...reveal()} id="intro-title" className={H2}>
+          About {shortName}
+        </motion.h2>
+        <motion.div {...reveal(0.1)}>
+          {hasValue(doctor.headline) && <p className="mt-6 text-[clamp(1.375rem,1.2rem+0.7vw,1.75rem)] font-semibold leading-snug">{doctor.headline}</p>}
+          {hasValue(doctor.headlineSupport) && <p className="mt-3 text-lg leading-relaxed text-[var(--b-muted)]">{doctor.headlineSupport}</p>}
+          {hasValue(doctor.bioShort) && <p className="mt-6 text-lg leading-relaxed">{doctor.bioShort}</p>}
+        </motion.div>
 
-        {/* The consultation sequence: a teal line draws through the stages */}
-        {stages.length > 0 && (
-        <div className="mt-16 md:mt-24">
-          <h3 className="sr-only">How a consultation unfolds</h3>
-          <ol className="relative grid gap-0 lg:grid-cols-5 lg:gap-6">
-            {/* Desktop: horizontal line through the markers */}
-            <div aria-hidden className="absolute inset-x-0 top-5 hidden lg:block">
-              <span className="absolute inset-x-0 top-0 h-px bg-line" />
-              <DrawLine className="absolute inset-x-0 top-0 bg-accent" duration={1.6} />
-            </div>
-            {/* Mobile: vertical line from the first marker to the last */}
-            <div aria-hidden className="absolute bottom-8 left-5 top-8 lg:hidden">
-              <span className="absolute inset-y-0 left-0 w-px bg-line" />
-              <DrawLine axis="y" className="absolute inset-y-0 left-0 bg-accent" duration={1.6} />
-            </div>
-
-            {stages.map((s, i) => (
-              <li key={s.title} className="relative grid grid-cols-[2.5rem_1fr] items-center gap-5 py-3 lg:flex lg:flex-col lg:items-start lg:gap-5 lg:py-0">
-                <span
-                  aria-hidden
-                  className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full border border-accent bg-surface font-serif tabular-nums text-accent"
-                >
-                  {i + 1}
-                </span>
-                <span className="font-serif text-[clamp(1.25rem,1.15rem+0.4vw,1.5rem)] leading-tight">
-                  <span className="sr-only">Stage {i + 1}: </span>
-                  {s.title}
-                </span>
-              </li>
+        {facts.length > 0 && (
+          <motion.dl {...stagger} className="mt-8 flex flex-wrap gap-3">
+            {facts.map((f) => (
+              <motion.div variants={ITEM} key={f.k} className="flex items-baseline gap-2 rounded-full bg-[var(--b-band)] px-5 py-2.5">
+                <dt className="text-sm font-semibold text-[var(--b-blue)]">{f.k}</dt>
+                <dd className="text-sm">{f.v}</dd>
+              </motion.div>
             ))}
-          </ol>
-          <Link to="/about" className="group/btn mt-10 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover md:mt-12">
-            <span className="link-underline">How a consultation unfolds</span>
-            <ArrowRight />
-          </Link>
-        </div>
+          </motion.dl>
         )}
+        <motion.div {...reveal(0.2, 12)} className="mt-6">
+          <TextLink to="/about">Full profile</TextLink>
+        </motion.div>
       </div>
     </section>
   )
 }
 
-/* ── 3. Areas of clinical focus: an editorial two-column index ── */
-function FocusIndex() {
-  const items = doctor.expertise.filter((e) => hasValue(e.title))
+/* ── 3. Clinical work: a tabbed record ───────────────────────────────────── */
+
+type Entry = { key: string; title: string; meta?: string; text?: string }
+type Tab = { id: string; label: string; entries: Entry[]; more: { to: string; label: string } }
+
+const joinValues = (values: (string | undefined)[], sep: string) => values.filter(hasValue).join(sep)
+
+const credentialEntries = (category: string): Entry[] =>
+  (doctor.credentials.find((g) => g.category === category)?.items ?? [])
+    .filter((c) => hasValue(c.title))
+    .map((c) => ({ key: c.title, title: c.title, meta: joinValues([c.institution, c.year], ', '), text: c.description }))
+
+/** Only tabs with confirmed entries are offered. */
+const TABS: Tab[] = (
+  [
+    {
+      id: 'focus',
+      label: 'Areas of focus',
+      entries: doctor.expertise.filter((e) => hasValue(e.title)).map((e) => ({ key: e.title, title: e.title, text: e.description })),
+      more: { to: '/expertise', label: 'All areas of care' },
+    },
+    {
+      id: 'experience',
+      label: 'Experience',
+      entries: doctor.experience
+        .filter((r) => hasValue(r.role))
+        .map((r, i) => ({
+          key: `${r.role}-${i}`,
+          title: r.role,
+          meta: joinValues([r.year, joinValues([r.institution, r.location], ', ')], ' · '),
+          text: r.description,
+        })),
+      more: { to: '/experience', label: 'Full timeline' },
+    },
+    {
+      id: 'education',
+      label: 'Education and training',
+      entries: [...credentialEntries(QUALIFICATIONS), ...credentialEntries(TRAINING)],
+      more: { to: '/research', label: 'All credentials' },
+    },
+  ] satisfies Tab[]
+).filter((t) => t.entries.length > 0)
+
+function ClinicalWork() {
+  const [active, setActive] = useState(0)
+  // Entries cascade in only after the visitor changes tab; on first view the whole card rises together.
+  const [switched, setSwitched] = useState(false)
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const animated = useDecorativeMotion()
+  const reveal = useReveal()
+  if (TABS.length === 0) return null
+  const tab = TABS[active]
+  const select = (i: number) => {
+    setActive(i)
+    setSwitched(true)
+  }
+
+  // Arrow keys move between tabs (either orientation, as the list is vertical on wide screens
+  // and horizontal on small ones); Home and End jump to the ends.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const moves: Record<string, number> = { ArrowDown: active + 1, ArrowRight: active + 1, ArrowUp: active - 1, ArrowLeft: active - 1, Home: 0, End: TABS.length - 1 }
+    if (!(e.key in moves)) return
+    e.preventDefault()
+    const i = (moves[e.key] + TABS.length) % TABS.length
+    select(i)
+    tabRefs.current[i]?.focus()
+  }
+
+  return (
+    <div className="container-page">
+      <motion.h2 {...reveal()} id="work-title" className={H2}>
+        Clinical work
+      </motion.h2>
+
+      <div className="mt-8 grid gap-6 md:mt-10 lg:grid-cols-12 lg:items-start lg:gap-8">
+        {/* Tab list: a blue panel; a white highlight slides to the selected tab */}
+        <motion.div
+          {...reveal(0.1, 16)}
+          role="tablist"
+          aria-labelledby="work-title"
+          onKeyDown={onKeyDown}
+          className="flex gap-1 overflow-x-auto rounded-3xl bg-[var(--b-blue)] p-2 shadow-[var(--b-shadow)] lg:col-span-3 lg:flex-col"
+        >
+          {TABS.map((t, i) => (
+            <button
+              key={t.id}
+              ref={(el) => {
+                tabRefs.current[i] = el
+              }}
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              aria-selected={i === active}
+              aria-controls={`panel-${t.id}`}
+              tabIndex={i === active ? 0 : -1}
+              onClick={() => select(i)}
+              className={`relative min-h-11 shrink-0 rounded-2xl px-5 py-2.5 text-left text-[0.9375rem] font-semibold transition-colors duration-300 ${
+                i === active ? 'text-[var(--b-blue)]' : 'text-[var(--b-on-blue)] hover:bg-white/10'
+              }`}
+            >
+              {i === active && (
+                <motion.span
+                  layoutId="home-tab-highlight"
+                  aria-hidden
+                  className="absolute inset-0 rounded-2xl bg-[var(--b-card)]"
+                  transition={{ duration: animated ? 0.45 : 0, ease: EASE }}
+                />
+              )}
+              <span className="relative">{t.label}</span>
+            </button>
+          ))}
+        </motion.div>
+
+        {/* The selected tab's entries in a white card */}
+        <motion.div {...reveal(0.2)} className="rounded-[2rem] bg-[var(--b-card)] p-6 shadow-[var(--b-shadow)] sm:p-8 lg:col-span-9 lg:p-10">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={tab.id}
+              role="tabpanel"
+              id={`panel-${tab.id}`}
+              aria-labelledby={`tab-${tab.id}`}
+              tabIndex={0}
+              initial={animated ? { opacity: 0, y: 8 } : false}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE } }}
+              exit={{ opacity: 0, transition: { duration: animated ? 0.15 : 0, ease: EASE_EXIT } }}
+              className="rounded-lg"
+            >
+              <ul className="divide-y divide-[var(--b-line)]">
+                {tab.entries.map((e, i) => (
+                  <motion.li
+                    key={e.key}
+                    initial={animated && switched ? { opacity: 0, y: 10 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, ease: EASE, delay: 0.05 * i }}
+                    className="grid gap-x-5 py-5 first:pt-0 last:pb-0 sm:grid-cols-[2.5rem_1fr]">
+                    <span aria-hidden className="hidden pt-0.5 font-bold tabular-nums text-[var(--b-blue)] sm:block">
+                      {pad(i + 1)}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-[1.125rem] font-bold leading-snug text-[var(--b-blue)]">{e.title}</h3>
+                      {hasValue(e.meta) && <p className="mt-1 text-sm font-medium text-[var(--b-muted)]">{e.meta}</p>}
+                      {hasValue(e.text) && <p className="mt-2 leading-relaxed">{e.text}</p>}
+                    </div>
+                  </motion.li>
+                ))}
+              </ul>
+              <div className="mt-6 border-t border-[var(--b-line)] pt-4">
+                <TextLink to={tab.more.to}>{tab.more.label}</TextLink>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+/* ── 4. Approach: the doctor's own statement ─────────────────────────────── */
+
+const approachQuote = [doctor.approachStatement, doctor.about.philosophy].find(hasValue)
+
+function Approach() {
+  const reveal = useReveal()
+  const animated = useDecorativeMotion()
+  if (!approachQuote) return null
+  return (
+    <div className="container-page mt-16 md:mt-24">
+      <motion.figure {...reveal()} className="relative overflow-hidden rounded-[2rem] bg-[var(--b-card)] p-8 shadow-[var(--b-shadow)] sm:p-10 lg:p-14">
+        <motion.span
+          aria-hidden
+          className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--b-shape)] opacity-60"
+          initial={animated ? { scale: 0.4 } : false}
+          whileInView={{ scale: 1 }}
+          viewport={ONCE}
+          transition={{ duration: 1.4, ease: EASE, delay: 0.2 }}
+        />
+        <h2 className={`${H2} relative`}>Approach to care</h2>
+        <motion.blockquote {...reveal(0.2, 12)} className="relative mt-6 max-w-4xl text-[clamp(1.25rem,1.1rem+0.6vw,1.5rem)] leading-[1.55]">{approachQuote}</motion.blockquote>
+        <figcaption className="relative mt-6 text-sm font-semibold text-[var(--b-muted)]">{doctor.name}</figcaption>
+      </motion.figure>
+    </div>
+  )
+}
+
+/* ── 5. Professional memberships: cards in a grid ────────────────────────── */
+
+// "American Society of Clinical Oncology (ASCO)" -> the abbreviation large, the full name beneath.
+const splitAbbr = (title: string) => {
+  const m = /^(.*)\s+\(([^)]+)\)$/.exec(title)
+  return m ? { name: m[1], abbr: m[2] } : { name: title, abbr: '' }
+}
+
+function Memberships() {
+  const items = (doctor.credentials.find((g) => g.category === 'Professional Memberships')?.items ?? []).filter((c) => hasValue(c.title))
+  const reveal = useReveal()
+  const stagger = useStagger()
   if (items.length === 0) return null
 
   return (
-    <section aria-labelledby="focus-title" className="container-page section-y">
-      <div className="grid gap-10 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <RevealText as="h2" id="focus-title" lines={['Areas of', 'clinical focus']} className="heading-2" />
-        </div>
-
-        <ol className="grid gap-x-10 sm:grid-cols-2 lg:col-span-8">
-          {items.map((item, i) => (
-            <li key={i} className="relative">
-              <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={(i % 2) * 0.08} />
-              <Link to="/expertise" className="group block py-7 md:py-9">
-                <span aria-hidden className="font-serif tabular-nums text-brass">
-                  {pad(i + 1)}
-                </span>
-                <h3 className="heading-3 mt-3 transition-[transform,color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1.5 group-hover:text-accent">
-                  {item.title}
-                </h3>
-                {hasValue(item.description) && <p className="mt-3 text-fg/85">{item.description}</p>}
-              </Link>
-            </li>
-          ))}
-        </ol>
-      </div>
-      <div className="mt-6 lg:ml-[calc(33.333%+0.833rem)]">
-        <Link to="/expertise" className="group/btn inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-          <span className="link-underline">All areas of care</span>
-          <ArrowRight />
-        </Link>
-      </div>
-    </section>
-  )
-}
-
-/* ── 4. Record: recent roles as a short timeline, beside research interests ── */
-function RecordSpread() {
-  const roles = doctor.experience.filter((r) => hasValue(r.role)).slice(0, 3)
-  const interests = publishable(doctor.researchInterests)
-  if (roles.length === 0 && interests.length === 0) return null
-
-  return (
-    <section aria-label="Experience and research" className="border-t border-line">
-      <div className="container-page section-y">
-        <div className="grid gap-16 lg:grid-cols-12 lg:gap-10">
-          {/* Experience */}
-          {roles.length > 0 && (
-          <div className="lg:col-span-7">
-            <RevealText as="h2" lines={['Track record']} className="heading-2" />
-            <ol className="relative mt-10 border-l border-line pl-7 sm:pl-10">
-              <DrawLine axis="y" className="absolute -left-px bottom-0 top-0 bg-accent" duration={1.4} />
-              {roles.map((r, i) => (
-                <li key={i} className="relative pb-9 last:pb-0">
-                  <span aria-hidden className="absolute -left-[calc(1.75rem+5px)] top-2 h-[9px] w-[9px] rounded-full border border-accent bg-bg sm:-left-[calc(2.5rem+5px)]" />
-                  {hasValue(r.year) && <p className="font-serif tabular-nums text-brass">{r.year}</p>}
-                  <h3 className="heading-3 mt-1">{r.role}</h3>
-                  {[r.institution, r.location].some(hasValue) && <p className="mt-1 text-muted">{[r.institution, r.location].filter(hasValue).join(', ')}</p>}
-                </li>
-              ))}
-            </ol>
-            <Link to="/experience" className="group/btn mt-10 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-              <span className="link-underline">Full timeline and credentials</span>
-              <ArrowRight />
-            </Link>
-          </div>
-          )}
-
-          {/* Research */}
-          {interests.length > 0 && (
-          <div className={roles.length > 0 ? 'lg:col-span-4 lg:col-start-9' : 'lg:col-span-7'}>
-            <RevealText as="h2" lines={['Research interests']} className="heading-2" />
-            <ul className="mt-10">
-              {interests.map((r, i) => (
-                <li key={i} className="relative py-4">
-                  <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={i * 0.08} />
-                  {r}
-                </li>
-              ))}
-              <li aria-hidden className="relative">
-                <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={interests.length * 0.08} />
-              </li>
-            </ul>
-            <Link to="/research" className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-              <span className="link-underline">Research and publications</span>
-              <ArrowRight />
-            </Link>
-          </div>
-          )}
-        </div>
-      </div>
-    </section>
+    <div className="container-page mt-16 md:mt-24">
+      <motion.h2 {...reveal()} className={`${H2} text-center`}>
+        Professional memberships
+      </motion.h2>
+      <motion.ul {...stagger} className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((m) => {
+          const { name, abbr } = splitAbbr(m.title)
+          return (
+            <motion.li variants={ITEM} key={m.title} className={`relative overflow-hidden rounded-3xl bg-[var(--b-card)] p-7 shadow-[var(--b-shadow)] ${LIFT}`}>
+              <svg aria-hidden viewBox="0 0 40 40" className="absolute -right-3 -top-3 h-20 w-20 opacity-[0.08]">
+                <path d={CROSS} fill="var(--b-blue)" />
+              </svg>
+              {abbr && <p aria-hidden className="text-[1.75rem] font-black leading-none tracking-[-0.02em] text-[var(--b-blue)]">{abbr}</p>}
+              <h3 className={`relative font-bold leading-snug ${abbr ? 'mt-3 text-base' : 'text-[1.125rem] text-[var(--b-blue)]'}`}>
+                {name}
+                {abbr && <span className="sr-only"> ({abbr})</span>}
+              </h3>
+            </motion.li>
+          )
+        })}
+      </motion.ul>
+    </div>
   )
 }

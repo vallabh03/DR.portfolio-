@@ -7,7 +7,6 @@ import RevealText from '../components/RevealText'
 import MedicalImage from '../components/MedicalImage'
 import DrawLine from '../components/DrawLine'
 import Button, { ArrowRight, ArrowUpRight } from '../components/Button'
-import BookingPrompt from '../components/BookingPrompt'
 
 /**
  * Contact: a letterhead and a directory. The practice address is set large,
@@ -39,7 +38,6 @@ export default function Contact() {
       {addressLines.length > 0 && <Letterhead />}
       {(contactRows.length > 0 || hours.length > 0) && <Directory />}
       <UrgentNote />
-      <BookingPrompt />
     </>
   )
 }
@@ -119,11 +117,12 @@ function FramedPhotograph() {
           <MedicalImage
             src="/images/clinic.jpg"
             sizes="(min-width: 1024px) 38vw, 100vw"
-            alt="The clinic"
+            alt="Continental Hospitals, Hyderabad"
             placeholderLabel="Clinic"
             reveal={false}
             hoverZoom={false}
             className="h-full w-full"
+            imgClassName="object-[64%_center]"
           />
         </motion.div>
       </motion.div>

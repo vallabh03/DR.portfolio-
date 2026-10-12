@@ -19,20 +19,21 @@ type Props = {
 }
 
 const base =
-  'group/btn relative isolate inline-flex min-h-12 items-center justify-center gap-2.5 overflow-hidden rounded-md px-6 text-[0.9375rem] font-medium leading-none transition-colors duration-300 disabled:pointer-events-none disabled:opacity-50'
+  'group/btn relative isolate inline-flex min-h-12 items-center justify-center gap-2.5 overflow-hidden rounded-full px-6 text-[0.9375rem] font-semibold leading-none transition-colors duration-300 disabled:pointer-events-none disabled:opacity-50'
 
 /** Surface colours, and the fill that wipes in from the left on hover/focus. */
 const styles: Record<Exclude<Variant, 'text'>, { button: string; fill: string }> = {
-  primary: { button: 'bg-fg text-bg hover:text-on-accent focus-visible:text-on-accent', fill: 'bg-accent' },
-  secondary: { button: 'border border-fg text-fg hover:text-bg focus-visible:text-bg', fill: 'bg-fg' },
-  inverse: { button: 'bg-bg text-fg hover:text-on-accent focus-visible:text-on-accent', fill: 'bg-accent' },
+  primary: { button: 'bg-accent text-on-accent', fill: 'bg-accent-hover' },
+  secondary: { button: 'border-2 border-accent text-accent hover:text-on-accent focus-visible:text-on-accent', fill: 'bg-accent' },
+  inverse: { button: 'bg-bg text-accent', fill: 'bg-surface-2' },
 }
 
 const textStyle =
   'group/btn inline-flex min-h-11 items-center gap-2 text-[0.9375rem] font-medium text-accent transition-colors duration-200 hover:text-accent-hover'
 
 /**
- * Primary, secondary, inverse (on ink) and text-link buttons. Hover is a fill
+ * Primary (solid blue pill), secondary (outlined), inverse (on a blue panel) and
+ * text-link buttons, matching the Home page. Hover is a fill
  * that wipes across from the left with a small arrow shift, never a fade.
  */
 export default function Button({

@@ -1,1 +1,454 @@
-{}
+{
+  "/images/clinic.jpg": {
+    "width": 1672,
+    "height": 941,
+    "widths": [
+      640,
+      960,
+      1280,
+      1672
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/clinic"
+  },
+  "/images/doctor-about.jpg": {
+    "width": 941,
+    "height": 1672,
+    "widths": [
+      640,
+      941
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/doctor-about"
+  },
+  "/images/doctor-hero.jpg": {
+    "width": 1104,
+    "height": 1250,
+    "widths": [
+      640,
+      960,
+      1104
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/doctor-hero"
+  },
+  "/images/expertise-oral-cancer.jpg": {
+    "width": 1536,
+    "height": 1024,
+    "widths": [
+      640,
+      960,
+      1280,
+      1536
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-oral-cancer"
+  },
+  "/images/expertise-salivary.jpg": {
+    "width": 479,
+    "height": 417,
+    "widths": [
+      479
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-salivary"
+  },
+  "/images/expertise-thyroid.jpg": {
+    "width": 2000,
+    "height": 760,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-thyroid"
+  },
+  "/images/gallery-aiims-convocation-2023-closeup.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aiims-convocation-2023-closeup"
+  },
+  "/images/gallery-aiims-convocation-2023.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aiims-convocation-2023"
+  },
+  "/images/gallery-aiims-rishikesh-cme-group.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aiims-rishikesh-cme-group"
+  },
+  "/images/gallery-aiims-rishikesh-faculty.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aiims-rishikesh-faculty"
+  },
+  "/images/gallery-aiims-rishikesh-podium.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aiims-rishikesh-podium"
+  },
+  "/images/gallery-aiims-rishikesh-quality-of-life.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aiims-rishikesh-quality-of-life"
+  },
+  "/images/gallery-aoi-tg-con-2025-group.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aoi-tg-con-2025-group"
+  },
+  "/images/gallery-aoi-tg-con-2025-podium.jpg": {
+    "width": 2000,
+    "height": 1333,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-aoi-tg-con-2025-podium"
+  },
+  "/images/gallery-fhno-global-2025.jpg": {
+    "width": 2000,
+    "height": 1331,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-fhno-global-2025"
+  },
+  "/images/gallery-kaizen-2026-case.jpg": {
+    "width": 2000,
+    "height": 1500,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-kaizen-2026-case"
+  },
+  "/images/gallery-kaizen-2026-podium.jpg": {
+    "width": 1500,
+    "height": 2000,
+    "widths": [
+      640,
+      960,
+      1280,
+      1500
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-kaizen-2026-podium"
+  },
+  "/images/gallery-sindhu-doi-auditorium.jpg": {
+    "width": 1600,
+    "height": 1067,
+    "widths": [
+      640,
+      960,
+      1280,
+      1600
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-sindhu-doi-auditorium"
+  },
+  "/images/gallery-sindhu-doi-podium.jpg": {
+    "width": 1600,
+    "height": 1067,
+    "widths": [
+      640,
+      960,
+      1280,
+      1600
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-sindhu-doi-podium"
+  },
+  "/images/gallery-sindhu-doi-stage.jpg": {
+    "width": 1600,
+    "height": 1067,
+    "widths": [
+      640,
+      960,
+      1280,
+      1600
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/gallery-sindhu-doi-stage"
+  },
+  "/images/surgery-buccal-lesion.jpg": {
+    "width": 960,
+    "height": 1280,
+    "widths": [
+      640,
+      960
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-buccal-lesion"
+  },
+  "/images/surgery-buccal-mucosa.jpg": {
+    "width": 1500,
+    "height": 2000,
+    "widths": [
+      640,
+      960,
+      1280,
+      1500
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-buccal-mucosa"
+  },
+  "/images/surgery-cheek-lesion.jpg": {
+    "width": 530,
+    "height": 350,
+    "widths": [
+      530
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-cheek-lesion"
+  },
+  "/images/surgery-cheek-skin-involvement.jpg": {
+    "width": 630,
+    "height": 520,
+    "widths": [
+      630
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-cheek-skin-involvement"
+  },
+  "/images/surgery-cheek-ulcer.jpg": {
+    "width": 800,
+    "height": 600,
+    "widths": [
+      640,
+      800
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-cheek-ulcer"
+  },
+  "/images/surgery-ear-closure.jpg": {
+    "width": 582,
+    "height": 685,
+    "widths": [
+      582
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-ear-closure"
+  },
+  "/images/surgery-lip-cheek-defect.jpg": {
+    "width": 850,
+    "height": 1050,
+    "widths": [
+      640,
+      850
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-lip-cheek-defect"
+  },
+  "/images/surgery-lip-lesion.jpg": {
+    "width": 963,
+    "height": 1280,
+    "widths": [
+      640,
+      960,
+      963
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-lip-lesion"
+  },
+  "/images/surgery-oral-cavity-intraoral.jpg": {
+    "width": 864,
+    "height": 872,
+    "widths": [
+      640,
+      864
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-oral-cavity-intraoral"
+  },
+  "/images/surgery-oral-commissure.jpg": {
+    "width": 2000,
+    "height": 1500,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2000
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-oral-commissure"
+  },
+  "/images/surgery-tongue-lesion.jpg": {
+    "width": 1200,
+    "height": 1600,
+    "widths": [
+      640,
+      960,
+      1200
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/surgery-tongue-lesion"
+  }
+}
