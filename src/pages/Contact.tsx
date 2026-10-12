@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { motion, useInView } from 'motion/react'
 import { doctor, hasValue } from '../data/doctor'
 import { BOOK_PATH } from '../data/navigation'
@@ -36,6 +36,7 @@ export default function Contact() {
     <>
       <Opening />
       {addressLines.length > 0 && <Letterhead />}
+      {addressLines.length > 0 && <LocationMap />}
       {(contactRows.length > 0 || hours.length > 0) && <Directory />}
       <UrgentNote />
     </>
@@ -142,7 +143,7 @@ function Letterhead() {
           <RevealText
             as="address"
             lines={addressLines}
-            className="not-italic font-serif text-[clamp(2rem,1.4rem+2.6vw,3.75rem)] leading-[1.12] tracking-[-0.015em]"
+            className="not-italic font-serif text-[clamp(1.75rem,1.3rem+1.9vw,3rem)] leading-[1.15] tracking-[-0.015em]"
             delay={0.1}
           />
         </div>
@@ -151,6 +152,98 @@ function Letterhead() {
         </div>
       </div>
     </section>
+  )
+}
+
+/* ── 2b. Location map: Google Maps, loaded only when the visitor asks ───── */
+
+/** The address as one line, for the map search. */
+const mapQuery = addressLines.join(', ')
+
+/**
+ * The site promises no tracking cookies, and Google Maps can set them. So the
+ * map is not loaded until the visitor chooses to see it: until then a drawn,
+ * map-like card shows the pin and address, with a link to open Google Maps.
+ */
+function LocationMap() {
+  const [show, setShow] = useState(false)
+  const directions = hasValue(contact.mapUrl) ? contact.mapUrl : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
+
+  return (
+    <section aria-labelledby="map-title" className="container-page pb-12 md:pb-16 lg:pb-20">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <h2 id="map-title" className="heading-3">
+          Location
+        </h2>
+        <a href={directions} target="_blank" rel="noopener noreferrer" className="group/btn inline-flex min-h-11 items-center gap-2 font-semibold text-accent hover:text-accent-hover">
+          <span className="link-underline">Open in Google Maps</span>
+          <ArrowUpRight />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      </div>
+
+      <div className="relative mt-6 aspect-[4/5] overflow-hidden rounded-[1.75rem] border border-line bg-surface-2 sm:aspect-[16/9] lg:aspect-[21/9]">
+        {show ? (
+          <iframe
+            title={`Map showing ${mapQuery}`}
+            src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`}
+            className="absolute inset-0 h-full w-full border-0"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        ) : (
+          <>
+            <MapIllustration />
+            <div className="absolute inset-0 flex items-center justify-center p-4 sm:items-end sm:justify-start sm:p-6 lg:p-8">
+              <div className="w-full max-w-md rounded-2xl border border-line bg-bg/95 p-6 text-center sm:text-left shadow-[0_24px_48px_-28px_rgba(27,95,140,0.5)] backdrop-blur-sm">
+                <p className="font-semibold">{contact.clinic}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{addressLines.slice(1).join(', ')}</p>
+                <button
+                  type="button"
+                  onClick={() => setShow(true)}
+                  className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-6 text-[0.9375rem] font-semibold text-on-accent transition-colors duration-300 hover:bg-accent-hover"
+                >
+                  Show map
+                </button>
+                <p className="mt-3 text-xs leading-relaxed text-muted">The map is provided by Google Maps, which receives your IP address and may set cookies.</p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** A quiet, drawn street plan with a pin: decoration shown until the real map is loaded. */
+function MapIllustration() {
+  return (
+    <svg aria-hidden viewBox="0 0 800 340" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+      <rect width="800" height="340" fill="var(--surface-2)" />
+      {/* Green space and water */}
+      <path d="M560 0h240v120c-60 10-110-20-160 10s-70 40-80 20z" fill="var(--accent-soft)" />
+      <path d="M0 250c90-30 160 20 250-5s150-50 230-10 170 30 320 0v105H0z" fill="var(--accent-soft)" />
+      {/* Main roads */}
+      <g fill="none" stroke="var(--background)" strokeLinecap="round">
+        <path d="M-20 120C200 100 380 170 820 140" strokeWidth="18" />
+        <path d="M300 -20c20 120-10 230 30 380" strokeWidth="14" />
+        <path d="M640 -20c-30 140 20 240-10 380" strokeWidth="12" />
+      </g>
+      {/* Side streets */}
+      <g fill="none" stroke="var(--background)" strokeWidth="6" strokeLinecap="round" opacity="0.9">
+        <path d="M0 40h820M0 210c200-10 400 20 820-5M120 -10v360M470 -10c10 120-10 240 0 360M760 -10v360" />
+      </g>
+      <g fill="none" stroke="var(--border-strong)" strokeWidth="1" opacity="0.6">
+        <path d="M-20 120C200 100 380 170 820 140M300 -20c20 120-10 230 30 380M640 -20c-30 140 20 240-10 380" />
+      </g>
+      {/* The pin */}
+      <g transform="translate(600 150)">
+        <circle r="26" fill="var(--accent)" opacity="0.15" />
+        <path d="M0 6s-16-14-16-27a16 16 0 0 1 32 0C16-8 0 6 0 6z" fill="var(--accent)" />
+        <circle cy="-21" r="6" fill="var(--background)" />
+      </g>
+    </svg>
   )
 }
 
