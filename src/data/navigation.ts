@@ -1,5 +1,5 @@
-import { doctor } from './doctor'
-import { findSection } from './gallery'
+import { doctor } from './doctor.ts'
+import { findSection } from './gallery.ts'
 
 /** Testimonials appear only once real, patient-approved testimonials exist. */
 export const showTestimonials = doctor.testimonials.length > 0

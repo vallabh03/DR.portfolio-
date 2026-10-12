@@ -13,8 +13,10 @@ import Gallery from './pages/Gallery'
 import GallerySectionPage from './pages/GallerySectionPage'
 import Contact from './pages/Contact'
 import Consultation from './pages/Consultation'
+import NotFound from './pages/NotFound'
 import PageTransition from './components/PageTransition'
-import { BOOK_PATH, documentTitle, legacyRedirects } from './data/navigation'
+import { BOOK_PATH, legacyRedirects } from './data/navigation'
+import { applyPageMeta } from './lib/head'
 
 /* ── Scroll positions per history entry, so Back/Forward return to where you were ── */
 const STORE = 'at-scroll'
@@ -58,7 +60,7 @@ function PageEnter({ locationKey, pathname, navType }: { locationKey: string; pa
     const key = entryKey(locationKey, pathname)
     if (displayedKey === key) return // already handled (React StrictMode re-runs effects in development)
     displayedKey = key
-    document.title = documentTitle(pathname)
+    applyPageMeta(pathname)
     const saved = positions[key]
     const restore = navType === 'POP' && saved !== undefined && (!firstPage || firstLoadRestores())
     if (restore) window.scrollTo({ top: saved, behavior: 'instant' })
@@ -118,7 +120,7 @@ export default function App() {
               {Object.entries(legacyRedirects).map(([from, to]) => (
                 <Route key={from} path={from} element={<Navigate to={to} replace />} />
               ))}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </PageTransition>
         </AnimatePresence>
