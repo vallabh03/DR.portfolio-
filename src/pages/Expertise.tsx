@@ -1,38 +1,37 @@
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion, useScroll, useTransform } from 'motion/react'
 import { Link } from 'react-router'
 import { doctor, hasValue, publishable } from '../data/doctor'
 import { BOOK_PATH } from '../data/navigation'
-import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
+import { EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
+import { REGION_LABEL, regionFor } from '../data/regions'
 import MedicalImage from '../components/MedicalImage'
-import DrawLine from '../components/DrawLine'
+import imageManifest from '../data/image-manifest.json'
 import { ArrowRight } from '../components/Button'
-import BookingPrompt from '../components/BookingPrompt'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const areaId = (i: number) => `area-${i + 1}`
+/** Intrinsic sizes of the optimised images, keyed by path. */
+const manifest = imageManifest as Record<string, { width: number; height: number }>
 
 /** The areas that can be published: those with a confirmed title. */
 const areas = doctor.expertise.filter((e) => hasValue(e.title))
-/** The sticky image plate is used only when at least one area has an image. */
-const hasPlates = areas.some((a) => hasValue(a.image))
 
 /**
- * Expertise: a clinical atlas. One entry per area of focus, each with its
- * conditions and procedures always visible. On desktop a sticky image plate
- * follows the entry being read: the plate wipes upward to the next image, its
- * number rolls, and an indicator shows position in the sequence.
+ * Expertise: a showcase of the areas of care. On a deep blue band, a sticky
+ * panel (desktop) shows the area being read and swaps to the next with a bar
+ * wipe, while beside it each area's image drifts gently upward. On phones each
+ * area is a simple block: text, then its image.
  */
 export default function Expertise() {
   const active = useActiveArea(areas.length)
 
   return (
     <>
-      <Opening active={active} />
-      {areas.length > 0 && <Atlas active={active} />}
+      <Opening />
+      {areas.length > 0 && <Showcase active={active} />}
       <ClosingNote />
-      <BookingPrompt />
     </>
   )
 }
@@ -54,89 +53,115 @@ function useActiveArea(count: number) {
   return active
 }
 
-function useJumpTo() {
-  const reduce = useReducedMotion()
-  return (i: number) => {
-    const el = document.getElementById(areaId(i))
+/* ── 1. Opening: a deep blue hero that runs into the showcase ─────────────── */
+
+function Opening() {
+  const animated = useDecorativeMotion()
+  const entrance = useEntrance()
+
+  // Scrolls to the first area (no route or hash change) and moves keyboard focus there.
+  const toFirstArea = () => {
+    const el = document.getElementById(areaId(0))
     if (!el) return
-    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 112, behavior: reduce ? 'instant' : 'smooth' })
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 64, behavior: animated ? 'smooth' : 'instant' })
     el.focus({ preventScroll: true })
   }
-}
-
-/* ── 1. Opening: headline, introduction and a table of contents ──────────── */
-
-function Opening({ active }: { active: number }) {
-  const entrance = useEntrance()
-  const jumpTo = useJumpTo()
-  const items = areas
-
   return (
-    <section aria-labelledby="expertise-title" className="container-page pb-12 pt-10 md:pb-16 md:pt-16 lg:pt-24">
-      <div className="grid gap-8 lg:grid-cols-12 lg:items-end lg:gap-10">
-        <RevealText as="h1" id="expertise-title" lines={['Areas of', 'clinical focus']} className="display-hero lg:col-span-8" delay={0.1} immediate />
-        <motion.p className="lead measure lg:col-span-4 lg:pb-3" {...entrance(0.45)}>
-          Each area of clinical focus, with the conditions and procedures it covers.
-        </motion.p>
+    <section aria-labelledby="expertise-title" className="showcase relative overflow-hidden bg-[var(--s-bg)] text-[var(--s-text)]">
+      {/* Decoration: soft light from the upper right and faint contour lines */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -right-40 -top-40 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(closest-side,rgba(124,192,236,0.16),transparent)]" />
+        <svg viewBox="0 0 600 600" className="absolute -right-24 top-1/2 hidden h-[34rem] w-[34rem] -translate-y-1/2 md:block">
+          {Array.from({ length: 10 }, (_, k) => (
+            <motion.ellipse
+              key={k}
+              cx={330 - k * 4}
+              cy={300 + k * 3}
+              rx={40 + k * 26}
+              ry={30 + k * 22}
+              transform="rotate(-18 300 300)"
+              fill="none"
+              stroke="var(--s-accent)"
+              strokeWidth="1"
+              initial={animated ? { pathLength: 0, opacity: 0 } : false}
+              animate={{ pathLength: 1, opacity: 0.22 - k * 0.018 }}
+              transition={{ duration: 1.6, ease: EASE_IN_OUT, delay: 0.3 + k * 0.06 }}
+            />
+          ))}
+        </svg>
       </div>
 
-      {/* Table of contents: the areas as one set */}
-      {items.length > 0 && (
-      <nav aria-label="Areas of care" className="relative mt-12 md:mt-16">
-        <DrawLine immediate delay={0.5} duration={1.2} className="absolute inset-x-0 top-0 bg-line-strong" />
-        <ol className="grid lg:grid-cols-4 lg:gap-6">
-          {items.map((item, i) => (
-            <li key={i} className="relative border-b border-line lg:border-b-0">
-              <button
-                type="button"
-                onClick={() => jumpTo(i)}
-                aria-current={active === i ? 'true' : undefined}
-                className="group flex min-h-11 w-full items-baseline gap-3 py-3 text-left lg:pb-5 lg:pt-4"
-              >
-                <span aria-hidden className="font-serif tabular-nums text-brass">
-                  {pad(i + 1)}
-                </span>
-                <span
-                  className={`transition-[transform,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 group-hover:text-fg ${
-                    active === i ? 'text-fg' : 'text-muted'
-                  }`}
+      <div className="container-page relative pb-14 pt-16 md:pb-20 md:pt-24 lg:pb-24 lg:pt-28">
+        <div className="grid gap-12 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-8">
+            {hasValue(doctor.specialty) && (
+              <motion.p {...entrance(0.05)} className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--s-accent)]">
+                <span aria-hidden className="h-px w-10 bg-[var(--s-accent)]" />
+                {doctor.specialty}
+              </motion.p>
+            )}
+            <RevealText
+              as="h1"
+              id="expertise-title"
+              lines={['Areas of', <span key="accent" className="text-[var(--s-accent)]">clinical focus</span>]}
+              className="display-hero mt-6"
+              delay={0.15}
+              immediate
+            />
+          </div>
+
+          {/* The number of areas, and a cue to scroll into them */}
+          <motion.div {...entrance(0.5)} className="flex items-end justify-between gap-8 lg:col-span-4 lg:flex-col lg:items-end lg:justify-end">
+            <p className="lg:text-right">
+              <span className="block font-serif text-[clamp(4rem,3rem+4vw,7rem)] leading-none tabular-nums">{pad(areas.length)}</span>
+              <span className="mt-2 block text-sm font-semibold uppercase tracking-[0.16em] text-[var(--s-muted)]">Areas of care</span>
+            </p>
+            <button type="button" onClick={toFirstArea} className="group inline-flex min-h-11 items-center gap-3 text-sm font-semibold text-[var(--s-text)]">
+              Scroll to explore
+              <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--s-accent)] text-[var(--s-accent)] transition-colors duration-300 group-hover:bg-[var(--s-accent)] group-hover:text-[var(--s-bg)]">
+                <motion.svg
+                  viewBox="0 0 16 16"
+                  className="h-4 w-4"
+                  animate={animated ? { y: [0, 3, 0] } : undefined}
+                  transition={{ duration: 1.8, ease: 'easeInOut', repeat: Infinity, delay: 1.5 }}
                 >
-                  {item.title}
-                </span>
-              </button>
-              {/* The active marker slides between entries (desktop) */}
-              {active === i && (
-                <motion.span
-                  layoutId="atlas-toc-marker"
-                  aria-hidden
-                  className="absolute bottom-0 left-0 hidden h-px w-10 bg-accent lg:block"
-                  transition={{ duration: 0.45, ease: EASE_IN_OUT }}
-                />
-              )}
-            </li>
-          ))}
-        </ol>
-      </nav>
-      )}
+                  <path d="M8 2v11M3 8.5l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </motion.svg>
+              </span>
+            </button>
+          </motion.div>
+        </div>
+        <div aria-hidden className="mt-14 h-px bg-[rgba(238,245,250,0.14)] md:mt-20" />
+      </div>
     </section>
   )
 }
 
-/* ── 2. The atlas: sticky plate (desktop) beside the entries ─────────────── */
+/* ── 2. Showcase: sticky wiping text (desktop) beside each area's image ─── */
 
-function Atlas({ active }: { active: number }) {
+function Showcase({ active }: { active: number }) {
+  const item = areas[active]
   return (
-    <section aria-label="Areas of care in detail" className="border-t border-line">
-      <div className="container-page pb-16 pt-12 md:pb-24 md:pt-16 lg:pb-32">
-        <div className="grid gap-10 lg:grid-cols-12">
-          {hasPlates && (
-            <div className="hidden lg:col-span-5 lg:block">
-              <Plate active={active} />
+    <section aria-label="Areas of care in detail" className="showcase bg-[var(--s-bg)] text-[var(--s-text)]">
+      <div className="container-page">
+        <div className="grid gap-x-12 lg:grid-cols-12">
+          {/* Desktop: the area being read, swapped with a bar wipe. Visual only; each block below carries the text. */}
+          <div className="hidden lg:col-span-5 lg:block">
+            <div className="sticky top-[22vh] py-10">
+              <WipePanel index={active} title={item.title} description={item.description} details={publishable(item.details)} detailsLabel={item.detailsLabel} />
+              <Link
+                to={BOOK_PATH}
+                className="group/btn mt-10 inline-flex min-h-11 items-center gap-2 font-semibold text-[var(--s-accent)] hover:text-[var(--s-text)]"
+              >
+                <span className="link-underline">Discuss this in a consultation</span>
+                <ArrowRight />
+              </Link>
             </div>
-          )}
-          <div className={hasPlates ? 'lg:col-span-7' : 'lg:col-span-8'}>
-            {areas.map((item, i) => (
-              <Entry key={i} index={i} isActive={active === i} title={item.title} description={item.description} details={item.details} detailsLabel={item.detailsLabel} image={item.image} />
+          </div>
+
+          <div className="lg:col-span-7">
+            {areas.map((a, i) => (
+              <AreaBlock key={i} index={i} title={a.title} description={a.description} details={publishable(a.details)} detailsLabel={a.detailsLabel} image={a.image} />
             ))}
           </div>
         </div>
@@ -145,160 +170,139 @@ function Atlas({ active }: { active: number }) {
   )
 }
 
-/** The sticky image plate: wipes upward between images, with a rolling number and progress. */
-function Plate({ active }: { active: number }) {
-  const items = areas
+/**
+ * Bars sweep across each line from the left to cover the outgoing area, then
+ * pull away to the right to uncover the next one. Under reduced motion the
+ * text simply changes.
+ */
+const BAR = {
+  covered: { scaleX: 1, originX: 1 },
+  shown: (i: number) => ({ scaleX: 0, originX: 1, transition: { duration: 0.38, ease: EASE_IN_OUT, delay: 0.06 * i } }),
+  out: (i: number) => ({ scaleX: [0, 1], originX: 0, transition: { duration: 0.26, ease: EASE_IN_OUT, delay: 0.04 * i } }),
+}
+
+function WipeLine({ i, children, className = '' }: { i: number; children: ReactNode; className?: string }) {
   const animated = useDecorativeMotion()
-  const item = items[active]
-
   return (
-    <figure className="sticky top-28">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-surface-2">
-        <AnimatePresence initial={false}>
-          <motion.div
-            key={active}
-            className="absolute inset-0"
-            initial={animated ? { clipPath: 'inset(100% 0% 0% 0%)', zIndex: 1 } : false}
-            animate={{ clipPath: 'inset(0% 0% 0% 0%)', zIndex: 1 }}
-            // The previous plate stays beneath until the new one has covered it.
-            exit={{ zIndex: 0, transition: { duration: 0, delay: animated ? 0.8 : 0 } }}
-            transition={{ duration: 0.8, ease: EASE_IN_OUT }}
-          >
-            <motion.div
-              className="absolute inset-0"
-              initial={animated ? { scale: 1.04 } : false}
-              animate={{ scale: 1 }}
-              transition={{ duration: 1.2, ease: EASE }}
-            >
-              {/* An area without its own image shows the standard placeholder */}
-              <MedicalImage
-                src={hasValue(item.image) ? item.image : undefined}
-                sizes="(min-width: 1360px) 520px, 38vw"
-                alt={`${item.title}, illustrative image`}
-                placeholderLabel={`Expertise ${pad(active + 1)}`}
-                priority
-                reveal={false}
-                hoverZoom={false}
-                className="h-full w-full"
-              />
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Caption: plate number, title and position in the sequence (visual; the entries carry the text) */}
-      <figcaption aria-hidden className="mt-5">
-        <div className="flex items-baseline justify-between gap-4">
-          <span className="flex items-baseline gap-2 text-sm text-muted">
-            Plate
-            <span className="relative inline-block h-[1.4em] overflow-hidden font-serif text-base tabular-nums text-brass">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={active}
-                  className="block leading-[1.4]"
-                  initial={animated ? { y: '100%' } : false}
-                  animate={{ y: '0%' }}
-                  exit={animated ? { y: '-100%', transition: { duration: 0.25, ease: EASE_EXIT } } : { opacity: 0, transition: { duration: 0 } }}
-                  transition={{ duration: 0.45, ease: EASE }}
-                >
-                  {pad(active + 1)}
-                </motion.span>
-              </AnimatePresence>
-            </span>
-            / {pad(items.length)}
-          </span>
-          <span className="truncate text-right text-sm text-fg">{item.title}</span>
-        </div>
-        {/* One segment per area, however many there are */}
-        <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
-          {items.map((_, i) => (
-            <span
-              key={i}
-              className={`h-px transition-colors duration-500 ${i === active ? 'bg-accent' : i < active ? 'bg-fg/40' : 'bg-line-strong'}`}
-            />
-          ))}
-        </div>
-      </figcaption>
-    </figure>
+    <span className={`relative inline-block max-w-full ${className}`}>
+      {children}
+      {animated && <motion.span aria-hidden custom={i} variants={BAR} className="absolute -inset-x-1 inset-y-0 bg-[var(--s-bar)]" />}
+    </span>
   )
 }
 
-/** One atlas entry: number, title, brass rule, description, and its conditions and procedures. */
-function Entry({
-  index,
-  isActive,
-  title,
-  description,
-  details,
-  detailsLabel,
-  image,
-}: {
-  index: number
-  isActive: boolean
-  title: string
-  description: string
-  details?: string[]
-  detailsLabel?: string
-  image?: string
-}) {
-  const animated = useDecorativeMotion()
-  const n = pad(index + 1)
-  const conditions = publishable(details)
+function WipePanel({ index, title, description, details, detailsLabel }: { index: number; title: string; description: string; details: string[]; detailsLabel?: string }) {
+  const region = regionFor(title)
+  return (
+    <div aria-hidden className="min-h-[22rem]">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={index} initial="covered" animate="shown" exit="out">
+          <WipeLine i={0} className="text-sm tabular-nums text-[var(--s-muted)]">
+            {pad(index + 1)} / {pad(areas.length)}
+          </WipeLine>
+          <div className="mt-6">
+            <WipeLine i={1} className="font-serif text-[clamp(2.25rem,1.6rem+1.8vw,3.25rem)] leading-[1.06] tracking-[-0.02em]">
+              {title}
+            </WipeLine>
+          </div>
+          <div className="mt-4">
+            <WipeLine i={2} className="text-sm font-semibold tracking-[0.02em] text-[var(--s-accent)]">
+              {REGION_LABEL[region]}
+            </WipeLine>
+          </div>
+          {hasValue(description) && (
+            <div className="mt-6">
+              <WipeLine i={3} className="text-lg leading-[1.65]">
+                {description}
+              </WipeLine>
+            </div>
+          )}
+          {details.length > 0 && (
+            <div className="mt-6">
+              <WipeLine i={4} className="text-[var(--s-muted)]">
+                <span className="font-semibold text-[var(--s-text)]">{hasValue(detailsLabel) ? detailsLabel : 'Conditions and procedures'}:</span>{' '}
+                {details.join('; ')}
+              </WipeLine>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
 
+/** One area: its text (shown on phones and tablets, read by screen readers everywhere) and its image. */
+function AreaBlock({ index, title, description, details, detailsLabel, image }: { index: number; title: string; description: string; details: string[]; detailsLabel?: string; image?: string }) {
+  const region = regionFor(title)
   return (
     <article
       id={areaId(index)}
       tabIndex={-1}
       aria-labelledby={`${areaId(index)}-title`}
-      className="relative py-12 focus:outline-none md:py-16 lg:flex lg:min-h-[70vh] lg:flex-col lg:justify-center"
+      className="relative py-14 focus:outline-none md:py-20 lg:flex lg:min-h-[105vh] lg:items-center lg:py-24"
     >
-      {index > 0 && <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />}
-
-      {/* Phones and tablets: the image sits in the entry, opening once as it arrives. Areas without an image have none. */}
-      {hasValue(image) && (
-        <MedicalImage
-          src={image}
-          sizes="(min-width: 768px) 90vw, 100vw"
-          alt={`${title}, illustrative image`}
-          placeholderLabel={`Expertise ${n}`}
-          hoverZoom={false}
-          className="mb-8 aspect-[4/3] w-full rounded-lg lg:hidden"
-        />
-      )}
-
-      <div className="flex items-baseline gap-4">
-        <span aria-hidden className="font-serif text-xl tabular-nums text-brass">
-          {n}
-        </span>
-        {/* Teal marker: ties the entry being read to the plate (desktop) */}
-        <motion.span
-          aria-hidden
-          className="hidden h-px w-8 origin-left self-center bg-accent lg:block"
-          initial={false}
-          animate={{ scaleX: isActive ? 1 : 0 }}
-          transition={{ duration: animated ? 0.5 : 0, ease: EASE_IN_OUT }}
-        />
+      <div className="w-full">
+        <div className="lg:sr-only">
+          <p className="text-sm tabular-nums text-[var(--s-muted)]">
+            {pad(index + 1)} / {pad(areas.length)}
+          </p>
+          <h2 id={`${areaId(index)}-title`} className="mt-4 font-serif text-[clamp(2rem,1.6rem+1.8vw,2.75rem)] leading-[1.08] tracking-[-0.02em]">
+            {title}
+          </h2>
+          <p className="mt-3 text-sm font-semibold text-[var(--s-accent)]">{REGION_LABEL[region]}</p>
+          {hasValue(description) && <p className="measure mt-5 text-lg leading-[1.65]">{description}</p>}
+          {details.length > 0 && (
+            <>
+              <h3 className="mt-6 text-sm font-semibold">{hasValue(detailsLabel) ? detailsLabel : 'Conditions and procedures'}</h3>
+              <ul className="measure mt-2 list-disc pl-5 text-[var(--s-muted)]">
+                {details.map((d) => (
+                  <li key={d} className="py-1">
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+        <AreaImage index={index} title={title} image={hasValue(image) ? image : undefined} />
+        <Link to={BOOK_PATH} className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-semibold text-[var(--s-accent)] lg:hidden">
+          <span className="link-underline">Discuss this in a consultation</span>
+          <ArrowRight />
+        </Link>
       </div>
-
-      <h2 id={`${areaId(index)}-title`} className="mt-4 font-serif text-[clamp(2.25rem,1.7rem+2.4vw,3.5rem)] leading-[1.05] tracking-[-0.02em]">
-        {title}
-      </h2>
-      <DrawLine className="mt-6 w-16 bg-brass" duration={0.7} />
-      {hasValue(description) && <p className="measure mt-6 text-lg leading-[1.7] text-fg/90">{description}</p>}
-
-      {conditions.length > 0 && (
-        <>
-          <h3 className="label mt-10">{hasValue(detailsLabel) ? detailsLabel : 'Conditions and procedures'}</h3>
-          <ul className="measure mt-3 border-t border-line">
-            {conditions.map((d, j) => (
-              <li key={j} className="border-b border-line py-3">
-                {d}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </article>
+  )
+}
+
+/**
+ * The area's image in a card that drifts gently upward as the area scrolls
+ * past. The card takes the image's own proportions, so labels at the edges are
+ * never cropped, and is never wider than the image itself, so a small image
+ * stays sharp. Until an image is supplied a 3:2 placeholder holds its place.
+ */
+function AreaImage({ index, title, image }: { index: number; title: string; image?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const size = image ? manifest[image] : undefined
+  const aspectRatio = size ? `${size.width} / ${size.height}` : '3 / 2'
+  const animated = useDecorativeMotion()
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
+  const y = useTransform(scrollYProgress, [0, 1], animated ? [60, -60] : [0, 0])
+
+  return (
+    <div ref={ref} className="mt-10 lg:mt-0">
+      <motion.figure style={{ y, maxWidth: size?.width }} className="mx-auto overflow-hidden rounded-2xl bg-[var(--s-card)] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+        <div style={{ aspectRatio }}>
+          <MedicalImage
+            src={image}
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            alt={`${title}, illustrative image`}
+            placeholderLabel={`Expertise ${pad(index + 1)}`}
+            hoverZoom={false}
+            className="h-full w-full"
+          />
+        </div>
+      </motion.figure>
+    </div>
   )
 }
 

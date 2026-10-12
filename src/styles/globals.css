@@ -5,41 +5,48 @@
 @source not "../../design-system";
 @source not "../../scripts";
 
-/* ── Colour system — Clinical Editorial ────────────────────────────────────────
-   Light ivory is the default. Dark is an optional theme set on <html>.        */
+/* ── Colour system — soft clinical blue ───────────────────────────────────────
+   The Home page palette, used across the site. White is the default; dark is an
+   optional theme set on <html>. "Brass" is kept as the token name for the
+   secondary text colour (years, small accents) and is now a deep slate blue.
+   Contrast (WCAG 2.x), every text colour on bg / surface / surface-2:
+   light fg 14.7 / 13.8 / 13.1, muted 7.0 / 6.6 / 6.3, subtle 5.6 / 5.3 / 5.0,
+   accent 6.9 / 6.5 / 6.1, brass 7.1 / 6.6 / 6.3, white on accent 6.9.
+   dark fg 15.8 / 13.5 / 12.0, muted 8.9 / 7.6 / 6.8, subtle 7.4 / 6.3 / 5.6,
+   accent 9.1 / 7.8 / 7.0, brass 10.8 / 9.2 / 8.2, dark text on accent 9.1.  */
 :root,
 [data-theme='light'] {
-  --background: #f6f3ec;
-  --surface: #ffffff;
-  --surface-2: #ede9df;
-  --foreground: #0e1b2c;
-  --muted: #566070;
-  --subtle: #6b7380;
-  --border: rgba(14, 27, 44, 0.12);
-  --border-strong: rgba(14, 27, 44, 0.26);
-  --accent: #1f5f63;
-  --accent-hover: #174a4d;
-  --accent-soft: rgba(31, 95, 99, 0.08);
+  --background: #ffffff;
+  --surface: #f3f9fd;
+  --surface-2: #e8f4fc;
+  --foreground: #1d2a33;
+  --muted: #4b5b66;
+  --subtle: #5a6a75;
+  --border: rgba(27, 95, 140, 0.14);
+  --border-strong: rgba(27, 95, 140, 0.3);
+  --accent: #1b5f8c;
+  --accent-hover: #154c70;
+  --accent-soft: rgba(27, 95, 140, 0.08);
   --on-accent: #ffffff;
-  --brass: #7a5c30;
+  --brass: #2f5d7c;
   --danger: #a8352c;
   color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --background: #0b1422;
-  --surface: #111c2d;
-  --surface-2: #17243a;
-  --foreground: #ece8df;
-  --muted: #9aa3b2;
-  --subtle: #8a93a2;
-  --border: rgba(236, 232, 223, 0.12);
-  --border-strong: rgba(236, 232, 223, 0.26);
-  --accent: #8cc5bf;
-  --accent-hover: #a6d4cf;
-  --accent-soft: rgba(140, 197, 191, 0.1);
-  --on-accent: #0b1422;
-  --brass: #c9a86a;
+  --background: #0f1720;
+  --surface: #172634;
+  --surface-2: #1a2f40;
+  --foreground: #e8f1f7;
+  --muted: #a9b8c3;
+  --subtle: #97a8b4;
+  --border: rgba(124, 192, 236, 0.14);
+  --border-strong: rgba(124, 192, 236, 0.3);
+  --accent: #7cc0ec;
+  --accent-hover: #a3d4f3;
+  --accent-soft: rgba(124, 192, 236, 0.1);
+  --on-accent: #0f1720;
+  --brass: #a8cde6;
   --danger: #f0928b;
   color-scheme: dark;
 }
@@ -263,6 +270,90 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Home page: soft clinical blue ────────────────────────────────────────────
+   Home's own names for the site palette above, plus its decorative shapes.
+   Contrast (WCAG 2.x), light: text on white 14.7, blue on white 6.9, white on
+   blue 6.9, muted on white 7.0, blue on the pale band 6.1. Dark: text 15.8,
+   blue 9.1, blue on cards 7.8, muted on cards 7.6. The light "shape" blues are
+   decoration only and never carry text.                                      */
+.home-blue {
+  --b-bg: #ffffff;
+  --b-band: #e8f4fc;
+  --b-shape: #d6ebf9;
+  --b-shape-2: #b9dcf3;
+  --b-blue: #1b5f8c;
+  --b-blue-hover: #154c70;
+  --b-on-blue: #ffffff;
+  --b-text: #1d2a33;
+  --b-muted: #4b5b66;
+  --b-card: #ffffff;
+  --b-line: rgba(27, 95, 140, 0.14);
+  --b-shadow: 0 22px 44px -28px rgba(27, 95, 140, 0.45);
+  background: var(--b-bg);
+  color: var(--b-text);
+}
+
+[data-theme='dark'] .home-blue {
+  --b-bg: #0f1720;
+  --b-band: #13202b;
+  --b-shape: #1a2f40;
+  --b-shape-2: #21405a;
+  --b-blue: #7cc0ec;
+  --b-blue-hover: #a3d4f3;
+  --b-on-blue: #0f1720;
+  --b-text: #e8f1f7;
+  --b-muted: #a9b8c3;
+  --b-card: #172634;
+  --b-line: rgba(124, 192, 236, 0.16);
+  --b-shadow: 0 22px 44px -28px rgba(0, 0, 0, 0.7);
+}
+
+/* Focus rings follow each element's text colour, so they stay visible on every surface. */
+.home-blue :focus-visible {
+  outline-color: currentColor;
+}
+
+/* ── Expertise showcase: a deep blue band in both themes ─────────────────────
+   Contrast: text on band 14.7 / on cards 12.4, muted 9.0 / 7.6, accent 8.2 /
+   6.9. The wipe bars are decorative and carry no text.                      */
+.showcase {
+  --s-bg: #0c2236;
+  --s-card: #123049;
+  --s-bar: #1b5f8c;
+  --s-text: #eef5fa;
+  --s-muted: #b3c4d1;
+  --s-accent: #7cc0ec;
+  /* Image placeholders inside the band take its colours rather than the page's */
+  --surface-2: var(--s-card);
+  --foreground: var(--s-text);
+  --muted: var(--s-muted);
+  --border: rgba(238, 245, 250, 0.14);
+}
+[data-theme='dark'] .showcase {
+  --s-bg: #0a1b2a;
+  --s-card: #11283c;
+}
+.showcase :focus-visible {
+  outline-color: currentColor;
+}
+
+/* ── Site footer: a deep blue band in both themes ────────────────────────────
+   Contrast on the band: text 14.7, muted 9.0, accent 8.2 (dark theme higher). */
+.site-footer {
+  --f-bg: #0c2236;
+  --f-tile: rgba(238, 245, 250, 0.06);
+  --f-text: #eef5fa;
+  --f-muted: #b3c4d1;
+  --f-accent: #7cc0ec;
+  --f-line: rgba(238, 245, 250, 0.14);
+}
+[data-theme='dark'] .site-footer {
+  --f-bg: #0a1b2a;
+}
+.site-footer :focus-visible {
+  outline-color: currentColor;
 }
 
 /* Native date/time pickers adopt the theme */

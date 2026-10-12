@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 export type Theme = 'dark' | 'light'
 
 const STORAGE_KEY = 'at-theme'
-const THEME_COLOR: Record<Theme, string> = { light: '#f6f3ec', dark: '#0b1422' }
+const THEME_COLOR: Record<Theme, string> = { light: '#ffffff', dark: '#0f1720' }
 
 type ThemeCtx = {
   theme: Theme

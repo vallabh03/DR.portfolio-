@@ -5,10 +5,10 @@ import { aboutHeading, doctor, hasValue, publishable, QUALIFICATIONS, TRAINING }
 import { EASE, EASE_EXIT, EASE_IN_OUT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import { useScrollTrack } from '../hooks/useScrollTrack'
 import RevealText from '../components/RevealText'
+import CredentialIcon from '../components/CredentialIcon'
 import MedicalImage from '../components/MedicalImage'
 import DrawLine from '../components/DrawLine'
 import { ArrowRight } from '../components/Button'
-import BookingPrompt from '../components/BookingPrompt'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -29,7 +29,6 @@ export default function About() {
       <Practice />
       {/* Shown only once the doctor has supplied and approved the stages */}
       {doctor.approach.some((s) => hasValue(s.title)) && <ApproachToCare />}
-      <BookingPrompt />
     </>
   )
 }
@@ -44,7 +43,7 @@ function CentreReveal() {
   const animated = useDecorativeMotion()
   return (
     <motion.div
-      className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-surface-2"
+      className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-surface-2 lg:aspect-auto lg:h-full lg:min-h-[34rem]"
       initial={animated ? { clipPath: 'inset(42% 42% 42% 42% round 12px)' } : false}
       animate={{ clipPath: 'inset(0% 0% 0% 0% round 12px)' }}
       transition={{ duration: 1.3, ease: EASE, delay: 0.25 }}
@@ -64,6 +63,7 @@ function CentreReveal() {
           reveal={false}
           hoverZoom={false}
           className="h-full w-full"
+          imgClassName="object-[center_22%]"
         />
       </motion.div>
     </motion.div>
@@ -72,13 +72,15 @@ function CentreReveal() {
 
 function Opener() {
   const entrance = useEntrance()
-  const byline = [doctor.title, doctor.contact.clinic, publishable(doctor.about.languages).join(', ')].filter(hasValue)
   const bio = publishable(doctor.bioFull)
+  // The title and practice line is shown only when there is no full biography (whose first paragraph says the same).
+  const byline = bio.length > 0 ? [] : [doctor.title, doctor.contact.clinic, publishable(doctor.about.languages).join(', ')].filter(hasValue)
 
   return (
     <section aria-labelledby="about-title" className="container-page pb-16 pt-10 md:pb-24 md:pt-16 lg:pt-20">
       <div className="grid gap-12 lg:grid-cols-12 lg:gap-0">
         {/* On phones the heading leads; on desktop the portrait sits on the left */}
+        {/* On desktop the portrait column stretches to the height of the text beside it */}
         <div className="order-2 mx-auto w-full max-w-[26rem] lg:order-1 lg:col-span-5 lg:max-w-none">
           <CentreReveal />
         </div>
@@ -88,7 +90,7 @@ function Opener() {
           <DrawLine axis="y" immediate delay={0.9} duration={1.2} className="absolute inset-y-0 left-1/2 bg-line" />
         </div>
 
-        <div className="order-1 lg:order-3 lg:col-span-6 lg:self-center">
+        <div className="order-1 lg:order-3 lg:col-span-6">
           <RevealText as="h1" id="about-title" lines={aboutHeading} className="heading-1" delay={0.1} immediate />
           <motion.div {...entrance(0.55)}>
             {byline.length > 0 && (
@@ -105,15 +107,21 @@ function Opener() {
                 ))}
               </ul>
             )}
-            {/* The biography, one paragraph per entry */}
+            {/* The biography, one paragraph per entry: the first as a lead, the rest at reading size */}
             {bio.length > 0 && (
               <>
-                <span aria-hidden className="mt-8 block h-px w-16 bg-accent" />
-                {bio.map((paragraph, i) => (
-                  <p key={i} className={`lead measure text-fg/85 ${i === 0 ? 'mt-8' : 'mt-5'}`}>
-                    {paragraph}
-                  </p>
-                ))}
+                <span aria-hidden className="mt-8 block h-0.5 w-16 bg-accent" />
+                {bio.map((paragraph, i) =>
+                  i === 0 ? (
+                    <p key={i} className="lead measure mt-8 text-fg/90">
+                      {paragraph}
+                    </p>
+                  ) : (
+                    <p key={i} className="measure mt-5 text-[1.0625rem] leading-[1.75] text-fg/80">
+                      {paragraph}
+                    </p>
+                  ),
+                )}
               </>
             )}
           </motion.div>
@@ -167,6 +175,46 @@ function Profile() {
     el.focus({ preventScroll: true })
   }
 
+  // With a single chapter there is nothing to navigate: heading beside the text, no index.
+  if (chapters.length === 1) {
+    const animated = !reduce
+    const [c] = chapters
+    return (
+      <section aria-label="Profile" className="border-t border-line">
+        <div className="container-page section-y">
+          {/* Both columns scroll with the page and rise in together, once */}
+          <motion.article
+            id={c.id}
+            aria-labelledby={`${c.id}-title`}
+            tabIndex={-1}
+            initial={animated ? { opacity: 0, y: 24 } : false}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={ONCE}
+            transition={{ duration: 0.8, ease: EASE }}
+            className="grid gap-10 focus:outline-none lg:grid-cols-12 lg:items-start lg:gap-12"
+          >
+            <div className="lg:col-span-4">
+              <span aria-hidden className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <StethoscopeIcon className="h-7 w-7" />
+              </span>
+              <h2 id={`${c.id}-title`} className="heading-2 mt-6">
+                {c.title}
+              </h2>
+              <span aria-hidden className="mt-6 block h-0.5 w-16 bg-accent" />
+              {c.kind === 'philosophy' && (
+                <p className="mt-6">
+                  <span className="block font-semibold">{doctor.name}</span>
+                  {hasValue(doctor.title) && <span className="mt-1 block text-sm text-muted">{doctor.title}</span>}
+                </p>
+              )}
+            </div>
+            <div className="lg:col-span-8">{c.kind === 'philosophy' ? <PhilosophyQuote body={c.body} /> : <p className="measure text-lg leading-[1.75] text-fg/90">{c.body}</p>}</div>
+          </motion.article>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section aria-label="Profile" className="border-t border-line">
       <div className="container-page section-y">
@@ -215,12 +263,9 @@ function Profile() {
               <article key={c.id} id={c.id} aria-labelledby={`${c.id}-title`} tabIndex={-1} className="focus:outline-none">
                 <ChapterHead n={i + 1} id={`${c.id}-title`} title={c.title} />
                 {c.kind === 'philosophy' ? (
-                  // Clinical philosophy, set as a quotation within the article
-                  <figure className="relative mt-8 py-10 md:py-12">
-                    <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />
-                    <blockquote className="font-serif text-[clamp(1.625rem,1.3rem+1.4vw,2.375rem)] leading-[1.3] tracking-[-0.01em]">{c.body}</blockquote>
-                    <DrawLine className="absolute inset-x-0 bottom-0 bg-line-strong" duration={1.1} delay={0.15} />
-                  </figure>
+                  <div className="mt-8">
+                    <PhilosophyQuote body={c.body} />
+                  </div>
                 ) : (
                   <p
                     className={`measure mt-6 text-lg leading-[1.7] text-fg/90 ${
@@ -239,6 +284,45 @@ function Profile() {
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * The clinical philosophy as a quotation card: a large quotation mark, the
+ * opening sentence as a serif lead, and the rest in the body face at a
+ * comfortable reading size and measure.
+ */
+function PhilosophyQuote({ body }: { body: string }) {
+  // Split after the first sentence; a single sentence is shown entirely as the lead.
+  const match = /^(.+?[.!?])\s+(.+)$/s.exec(body.trim())
+  const [lead, rest] = match ? [match[1], match[2]] : [body.trim(), '']
+
+  return (
+    <figure className="relative rounded-[2rem] bg-surface px-7 py-10 sm:px-10 md:px-14 md:py-14">
+      <span aria-hidden className="block font-serif text-6xl leading-none text-accent">
+        &ldquo;
+      </span>
+      <blockquote className="relative mt-2">
+        <p className="font-serif text-[clamp(1.5rem,1.25rem+1vw,2rem)] leading-[1.3] tracking-[-0.01em] text-fg">{lead}</p>
+        {rest && <p className="measure mt-6 text-[1.0625rem] leading-[1.8] text-fg/85 md:text-lg">{rest}</p>}
+      </blockquote>
+      {/* The closing mark, answering the opening one */}
+      <span aria-hidden className="mt-4 block text-right font-serif text-6xl leading-none text-accent">
+        &rdquo;
+      </span>
+    </figure>
+  )
+}
+
+/** A line-drawn stethoscope, the icon for the clinical philosophy. */
+function StethoscopeIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M4.5 3h3M14.5 3h3" />
+      <path d="M6 3v5a5 5 0 0 0 10 0V3" />
+      <path d="M11 13v2.5a4.5 4.5 0 0 0 9 0V15" />
+      <circle cx="20" cy="12.5" r="2.5" />
+    </svg>
   )
 }
 
@@ -265,10 +349,10 @@ function FactFile() {
   const plain = (values: string[]) => publishable(values).map((title) => ({ title, detail: '' }))
   // Rows with no confirmed entries are left out; the section is hidden if none remain.
   const rows = [
-    { title: 'Education', items: fromCredentials(QUALIFICATIONS) },
-    { title: 'Training', items: fromCredentials(TRAINING) },
-    { title: 'Experience', items: plain(about.experience) },
-    { title: 'Languages', items: plain(about.languages) },
+    { title: 'Education', icon: 'education' as const, noun: ['qualification', 'qualifications'], items: fromCredentials(QUALIFICATIONS) },
+    { title: 'Training', icon: 'training' as const, noun: ['programme', 'programmes'], items: fromCredentials(TRAINING) },
+    { title: 'Experience', icon: 'experience' as const, noun: ['role', 'roles'], items: plain(about.experience) },
+    { title: 'Languages', icon: 'languages' as const, noun: ['language', 'languages'], items: plain(about.languages) },
   ].filter((r) => r.items.length > 0)
   if (rows.length === 0) return null
 
@@ -278,8 +362,8 @@ function FactFile() {
         <div className="grid gap-10 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <RevealText as="h2" id="facts-title" lines={['Education and', 'training']} className="heading-2" />
-            <Link to="/experience" className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-              <span className="link-underline">Full timeline and credentials</span>
+            <Link to="/research" className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
+              <span className="link-underline">All credentials</span>
               <ArrowRight />
             </Link>
           </div>
@@ -288,7 +372,17 @@ function FactFile() {
             {rows.map((r, i) => (
               <div key={r.title} className="relative grid gap-2 py-6 sm:grid-cols-[12rem_1fr] sm:gap-6 md:py-7">
                 <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={i * 0.1} duration={1} />
-                <dt className="text-muted">{r.title}</dt>
+                <dt className="flex items-center gap-4 sm:flex-col sm:items-start sm:gap-3">
+                  <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                    <CredentialIcon name={r.icon} className="h-6 w-6" />
+                  </span>
+                  <span>
+                    <span className="block font-semibold text-fg">{r.title}</span>
+                    <span className="mt-0.5 block text-sm text-muted">
+                      {r.items.length} {r.noun[r.items.length === 1 ? 0 : 1]}
+                    </span>
+                  </span>
+                </dt>
                 <dd>
                   <ul className="space-y-3">
                     {r.items.map((item, j) => (
@@ -338,7 +432,7 @@ function Practice() {
             <MedicalImage
               src="/images/clinic.jpg"
               sizes="(min-width: 1360px) 1248px, 100vw"
-              alt="The clinic"
+              alt="Continental Hospitals, Hyderabad"
               placeholderLabel="Clinic"
               reveal={false}
               hoverZoom={false}

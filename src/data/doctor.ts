@@ -155,10 +155,15 @@ export const doctor: Doctor = {
   approachStatement:
     'My approach begins with understanding the disease and the person facing it. I explain the diagnosis, available treatment options and expected effects on everyday life so that patients and families can make informed decisions. Treatment planning considers cancer control alongside balancing the quality of life. Where needed, I work with colleagues in radiation oncology, medical oncology, reconstruction and rehabilitation to coordinate care through treatment and follow-up.',
 
-  // Not yet filled in: each waits for the doctor's confirmation.
-  // bioFull: one string per paragraph (full biography)
-  // registration: { body, number, show }
-  bioFull: [],
+  // Full biography for the About page, one string per paragraph, as supplied.
+  // Not yet filled in (waits for the doctor's confirmation): registration: { body, number, show }
+  bioFull: [
+    'Dr Abhinav Thaduri is a Consultant Head & Neck Surgical Oncologist at Continental Cancer Centre, Continental Hospitals, Hyderabad. He has more than a decade of experience across otolaryngology, head and neck surgery, and oncology, including postgraduate and specialist training.',
+    'He completed his M.Ch in Head & Neck Surgery and Oncology at the All India Institute of Medical Sciences, Rishikesh, and his MS in Otorhinolaryngology and Head & Neck Surgery at Gandhi Medical College, Hyderabad, where he received gold medal recognition. He also completed visiting fellowship training at the University of Brescia, Italy.',
+    'Before joining Continental Hospitals, he worked as a Consultant Head & Neck Surgical Oncologist at Basavatarakam Indo American Cancer Hospital & Research Institute, Hyderabad. His earlier work at Prathima Cancer Institute and Prathima Relief Medical College, Warangal, combined clinical practice with teaching in otolaryngology.',
+    'His practice includes oral cancer surgery, neck dissection, thyroid and parathyroid surgery, salivary gland surgery, and surgery for laryngeal and hypopharyngeal cancers. Treatment planning considers the extent of disease, the patient’s general health, and the likely effects on speech, swallowing and daily life, with a multidisciplinary approach.',
+    'Alongside clinical work, Dr Thaduri contributes to research on oral cancer staging, treatment outcomes, functional recovery and survivorship. His work has been published in peer-reviewed journals including Oral Oncology, Psycho-Oncology, European Archives of Oto-Rhino-Laryngology, International Journal of Oral and Maxillofacial Surgery and JCO Global Oncology. He has presented research at ESMO, ASCO and FHNO meetings.',
+  ],
 
   about: {
     // Professional journey: empty until the doctor supplies the text; the chapter is hidden while empty.
@@ -226,22 +231,25 @@ export const doctor: Doctor = {
     },
   ],
 
-  // Areas of expertise as supplied by the doctor. No images have been approved yet.
+  // Areas of expertise as supplied by the doctor. Images are added per area as they are supplied.
   expertise: [
     {
       title: 'Oral cancer surgery',
       description:
         'Assessment and surgical treatment of cancers affecting the tongue, inner cheek, gums, floor of the mouth and other oral cavity sites. Surgical planning addresses tumour removal, neck lymph nodes and reconstruction.',
+      image: '/images/expertise-oral-cancer.jpg',
     },
     {
       title: 'Thyroid and parathyroid surgery',
       description:
         'Evaluation and surgical management of thyroid and parathyroid conditions, with the extent of surgery tailored to the diagnosis and clinical findings.',
+      image: '/images/expertise-thyroid.jpg',
     },
     {
       title: 'Salivary gland tumours',
       description:
         'Assessment and surgery for benign and malignant tumours of the parotid, submandibular and other salivary glands, with attention to tumour clearance and relevant nerve function.',
+      image: '/images/expertise-salivary.jpg',
     },
     {
       title: 'Laryngeal and hypopharyngeal cancers',
