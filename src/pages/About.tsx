@@ -26,7 +26,6 @@ export default function About() {
       <Opener />
       {chapters.length > 0 && <Profile />}
       <FactFile />
-      <Practice />
       {/* Shown only once the doctor has supplied and approved the stages */}
       {doctor.approach.some((s) => hasValue(s.title)) && <ApproachToCare />}
     </>
@@ -43,7 +42,7 @@ function CentreReveal() {
   const animated = useDecorativeMotion()
   return (
     <motion.div
-      className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-surface-2 lg:aspect-auto lg:h-full lg:min-h-[34rem]"
+      className="relative aspect-[941/1300] w-full overflow-hidden rounded-lg bg-surface-2"
       initial={animated ? { clipPath: 'inset(42% 42% 42% 42% round 12px)' } : false}
       animate={{ clipPath: 'inset(0% 0% 0% 0% round 12px)' }}
       transition={{ duration: 1.3, ease: EASE, delay: 0.25 }}
@@ -63,7 +62,6 @@ function CentreReveal() {
           reveal={false}
           hoverZoom={false}
           className="h-full w-full"
-          imgClassName="object-[center_22%]"
         />
       </motion.div>
     </motion.div>
@@ -80,8 +78,8 @@ function Opener() {
     <section aria-labelledby="about-title" className="container-page pb-16 pt-10 md:pb-24 md:pt-16 lg:pt-20">
       <div className="grid gap-12 lg:grid-cols-12 lg:gap-0">
         {/* On phones the heading leads; on desktop the portrait sits on the left */}
-        {/* On desktop the portrait column stretches to the height of the text beside it */}
-        <div className="order-2 mx-auto w-full max-w-[26rem] lg:order-1 lg:col-span-5 lg:max-w-none">
+        {/* The portrait, cropped at wrist level; on desktop it stays in view while the biography scrolls beside it */}
+        <div className="order-2 mx-auto w-full max-w-[26rem] lg:sticky lg:top-28 lg:order-1 lg:col-span-5 lg:max-w-none lg:self-start">
           <CentreReveal />
         </div>
 
@@ -401,53 +399,6 @@ function FactFile() {
           </dl>
         </div>
       </div>
-    </section>
-  )
-}
-
-/* ── 4. The practice: a wide photograph that wipes open and settles ──────── */
-
-function Practice() {
-  const animated = useDecorativeMotion()
-  const clinic = doctor.contact.clinic
-
-  return (
-    <section aria-labelledby="practice-title" className="container-page section-y">
-      <RevealText as="h2" id="practice-title" lines={['The practice']} className="heading-2" />
-      <figure className="mt-10 md:mt-12">
-        <motion.div
-          className="relative aspect-[4/3] overflow-hidden rounded-lg bg-surface-2 md:aspect-[21/9]"
-          initial={animated ? { clipPath: 'inset(0% 100% 0% 0%)' } : false}
-          whileInView={{ clipPath: 'inset(0% 0% 0% 0%)' }}
-          viewport={ONCE}
-          transition={{ duration: 1.2, ease: EASE_IN_OUT }}
-        >
-          <motion.div
-            className="absolute inset-0"
-            initial={animated ? { scale: 1.06 } : false}
-            whileInView={{ scale: 1 }}
-            viewport={ONCE}
-            transition={{ duration: 1.8, ease: EASE }}
-          >
-            <MedicalImage
-              src="/images/clinic.jpg"
-              sizes="(min-width: 1360px) 1248px, 100vw"
-              alt="Continental Hospitals, Hyderabad"
-              placeholderLabel="Clinic"
-              reveal={false}
-              hoverZoom={false}
-              className="h-full w-full"
-            />
-          </motion.div>
-        </motion.div>
-        <figcaption className="mt-5 flex flex-col gap-3 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-          {hasValue(clinic) && <span className="text-fg/85">{clinic}</span>}
-          <Link to="/contact" className="group/btn inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-            <span className="link-underline">Visit and contact</span>
-            <ArrowRight />
-          </Link>
-        </figcaption>
-      </figure>
     </section>
   )
 }

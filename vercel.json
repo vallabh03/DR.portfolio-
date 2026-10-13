@@ -4,7 +4,8 @@
   "redirects": [
     { "source": "/credentials", "destination": "/research", "permanent": true },
     { "source": "/approach", "destination": "/about", "permanent": true },
-    { "source": "/testimonials", "destination": "/", "permanent": true }
+    { "source": "/testimonials", "destination": "/", "permanent": true },
+    { "source": "/experience", "destination": "/about", "permanent": true }
   ],
   "headers": [
     {

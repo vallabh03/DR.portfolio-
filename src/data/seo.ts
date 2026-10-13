@@ -38,9 +38,6 @@ const role = doctor.title.toLowerCase()
 const listOf = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
 
 const areas = doctor.expertise.filter((e) => hasValue(e.title))
-const roles = doctor.experience.filter((r) => hasValue(r.role))
-const places = [...new Set(roles.map((r) => r.location).filter(hasValue))]
-const since = roles.at(-1)?.year.match(/\d{4}/)?.[0]
 const education = (doctor.credentials.find((g) => g.category === QUALIFICATIONS)?.items ?? []).filter((c) => hasValue(c.title))
 
 export const pages: PageMeta[] = [
@@ -62,11 +59,6 @@ export const pages: PageMeta[] = [
     schemaType: 'MedicalWebPage',
   },
   {
-    path: '/experience',
-    title: documentTitle('/experience'),
-    description: `Clinical roles of ${doctor.name}${since ? ` since ${since}` : ''}, across ${roles.length} hospitals in ${listOf(places)}, including ${practice}.`,
-  },
-  {
     path: '/research',
     title: documentTitle('/research'),
     description: `Research and publications by ${doctor.name} on oral cancer staging, functional recovery and survivorship, with qualifications, training and professional memberships.`,
@@ -79,8 +71,8 @@ export const pages: PageMeta[] = [
   },
   {
     path: '/contact',
-    title: `Contact and Location · ${doctor.name}`,
-    description: `Visit ${doctor.name} at ${[contact.clinic, contact.addressLine].filter(hasValue).join(', ')}. Address, map and working hours.`,
+    title: `Contact · ${doctor.name}`,
+    description: `How to contact ${doctor.name}, ${role} at ${practice}. Contact details for the practice.`,
     schemaType: 'ContactPage',
   },
   {

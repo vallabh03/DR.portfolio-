@@ -43,9 +43,9 @@ const LIFT = 'transition-[translate,box-shadow] duration-500 ease-[cubic-bezier(
  *
  * Motion: the name rises in, the portrait opens and its background shapes settle,
  * then each section rises once as it scrolls into view, with list items arriving
- * in sequence. The tab highlight slides between tabs and cards lift on hover. The
- * cross tile's slow drift is the only continuous motion. Reduced motion shows
- * everything in place, with no movement.
+ * in sequence. The tab highlight slides between tabs and cards lift on hover.
+ * Nothing moves continuously. Reduced motion shows everything in place, with no
+ * movement.
  */
 export default function Home() {
   return (
@@ -95,17 +95,6 @@ function TextLink({ to, children }: { to: string; children: ReactNode }) {
   )
 }
 
-/** A soft medical cross in a raised white tile: the page's one decorative icon. */
-function CrossTile() {
-  return (
-    <div aria-hidden className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--b-card)] shadow-[var(--b-shadow)]">
-      <svg viewBox="0 0 40 40" className="h-10 w-10">
-        <path d={CROSS} fill="var(--b-blue)" stroke="var(--b-blue)" strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-    </div>
-  )
-}
-
 /* ── 1. Hero: the name set around the portrait ───────────────────────────── */
 
 function Hero() {
@@ -118,7 +107,7 @@ function Hero() {
     animated ? { initial: { x: 120, opacity: 0 }, animate: { x: 0, opacity }, transition: { duration: 1.4, ease: EASE, delay } } : {}
   const settle = (delay: number, opacity = 1) =>
     animated ? { initial: { scale: 0.85, opacity: 0 }, animate: { scale: 1, opacity }, transition: { duration: 1.2, ease: EASE, delay } } : {}
-  const NAME = 'font-sans font-black leading-[0.92] tracking-[-0.035em] text-[var(--b-blue)] text-[clamp(3.25rem,1.6rem+5.6vw,6.75rem)]'
+  const NAME = 'font-sans font-extrabold leading-[0.98] tracking-[-0.03em] text-[var(--b-blue)] text-[clamp(2.5rem,1.5rem+3.6vw,4.75rem)]'
 
   return (
     <section aria-labelledby="home-title" className="relative overflow-hidden">
@@ -155,19 +144,10 @@ function Hero() {
               className="relative aspect-[1104/1250] w-full rounded-[2rem] shadow-[var(--b-shadow)]"
               imgClassName="object-top"
             />
-            <motion.div {...entrance(0.9)} className="absolute -left-8 top-[38%] hidden sm:block lg:-left-10">
-              {/* A slow, small drift: the page's only continuous motion, off under reduced motion */}
-              <motion.div
-                animate={animated ? { y: [0, -8, 0] } : undefined}
-                transition={{ duration: 6, ease: 'easeInOut', repeat: Infinity, delay: 1.8 }}
-              >
-                <CrossTile />
-              </motion.div>
-            </motion.div>
           </div>
 
           {/* Line two: family name, then the title, practice and actions */}
-          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-2 lg:self-start lg:pl-[12%]">
+          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-2 lg:self-start">
             <motion.p aria-hidden {...rise(0.25)} className={NAME}>
               {doctor.lastLine}
             </motion.p>
@@ -263,7 +243,7 @@ const TABS: Tab[] = (
           meta: joinValues([r.year, joinValues([r.institution, r.location], ', ')], ' · '),
           text: r.description,
         })),
-      more: { to: '/experience', label: 'Full timeline' },
+      more: { to: '/about', label: 'Full background' },
     },
     {
       id: 'education',

@@ -24,16 +24,17 @@ test('the gallery has the three sections in order, with both surgery sections ma
   )
 })
 
-test('only enabled sections are shown; surgery videos are disabled for now', () => {
+test('only enabled sections are shown; surgery images and videos are disabled for now', () => {
   assert.deepEqual(
     visibleSections.map((s) => s.slug),
-    ['awards-and-conferences', 'surgery-images'],
+    ['awards-and-conferences'],
   )
+  assert.equal(findSection('surgery-images'), undefined, 'a disabled section has no page')
   assert.equal(findSection('surgery-videos'), undefined, 'a disabled section has no page')
 })
 
 test('sections are found by slug, and an unknown slug finds nothing', () => {
-  assert.equal(findSection('surgery-images')?.kind, 'photos')
+  assert.equal(findSection('awards-and-conferences')?.kind, 'photos')
   assert.equal(findSection('not-a-section'), undefined)
   assert.equal(findSection(undefined), undefined)
 })

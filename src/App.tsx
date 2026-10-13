@@ -7,7 +7,6 @@ import MobileBookBar from './components/MobileBookBar'
 import Home from './pages/Home'
 import About from './pages/About'
 import Expertise from './pages/Expertise'
-import Experience from './pages/Experience'
 import Research from './pages/Research'
 import Gallery from './pages/Gallery'
 import GallerySectionPage from './pages/GallerySectionPage'
@@ -111,7 +110,6 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
               <Route path="/expertise" element={<Expertise />} />
-              <Route path="/experience" element={<Experience />} />
               <Route path="/research" element={<Research />} />
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/gallery/:section" element={<GallerySectionPage />} />
