@@ -197,10 +197,7 @@ function WipePanel({ index, title, description, details, detailsLabel }: { index
     <div aria-hidden className="min-h-[22rem]">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={index} initial="covered" animate="shown" exit="out">
-          <WipeLine i={0} className="text-sm tabular-nums text-[var(--s-muted)]">
-            {pad(index + 1)} / {pad(areas.length)}
-          </WipeLine>
-          <div className="mt-6">
+          <div>
             <WipeLine i={1} className="font-serif text-[clamp(2.25rem,1.6rem+1.8vw,3.25rem)] leading-[1.06] tracking-[-0.02em]">
               {title}
             </WipeLine>
@@ -243,10 +240,7 @@ function AreaBlock({ index, title, description, details, detailsLabel, image }: 
     >
       <div className="w-full">
         <div className="lg:sr-only">
-          <p className="text-sm tabular-nums text-[var(--s-muted)]">
-            {pad(index + 1)} / {pad(areas.length)}
-          </p>
-          <h2 id={`${areaId(index)}-title`} className="mt-4 font-serif text-[clamp(2rem,1.6rem+1.8vw,2.75rem)] leading-[1.08] tracking-[-0.02em]">
+          <h2 id={`${areaId(index)}-title`} className="font-serif text-[clamp(2rem,1.6rem+1.8vw,2.75rem)] leading-[1.08] tracking-[-0.02em]">
             {title}
           </h2>
           <p className="mt-3 text-sm font-semibold text-[var(--s-accent)]">{REGION_LABEL[region]}</p>

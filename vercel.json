@@ -1,5 +1,12 @@
 {
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/credentials", "destination": "/research", "permanent": true },
+    { "source": "/approach", "destination": "/about", "permanent": true },
+    { "source": "/testimonials", "destination": "/", "permanent": true },
+    { "source": "/experience", "destination": "/about", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -9,6 +16,14 @@
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
       ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/images/optimized/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=2592000" }]
     }
   ]
 }

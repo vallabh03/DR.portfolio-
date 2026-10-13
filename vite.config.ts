@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Connect, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createStore, handleConsultation, type Env } from './api/consultation.ts'
+import seoPages from './scripts/seo-pages.ts'
 
 /**
  * Serves api/consultation.ts during `npm run dev` and `npm run preview`, so the
@@ -56,7 +57,7 @@ function consultationApi(mode: string): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss(), consultationApi(mode)],
+  plugins: [react(), tailwindcss(), consultationApi(mode), seoPages()],
   build: {
     target: 'es2022',
     cssMinify: true,

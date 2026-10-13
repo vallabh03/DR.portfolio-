@@ -7,14 +7,15 @@ import MobileBookBar from './components/MobileBookBar'
 import Home from './pages/Home'
 import About from './pages/About'
 import Expertise from './pages/Expertise'
-import Experience from './pages/Experience'
 import Research from './pages/Research'
 import Gallery from './pages/Gallery'
 import GallerySectionPage from './pages/GallerySectionPage'
 import Contact from './pages/Contact'
 import Consultation from './pages/Consultation'
+import NotFound from './pages/NotFound'
 import PageTransition from './components/PageTransition'
-import { BOOK_PATH, documentTitle, legacyRedirects } from './data/navigation'
+import { BOOK_PATH, legacyRedirects } from './data/navigation'
+import { applyPageMeta } from './lib/head'
 
 /* ── Scroll positions per history entry, so Back/Forward return to where you were ── */
 const STORE = 'at-scroll'
@@ -58,7 +59,7 @@ function PageEnter({ locationKey, pathname, navType }: { locationKey: string; pa
     const key = entryKey(locationKey, pathname)
     if (displayedKey === key) return // already handled (React StrictMode re-runs effects in development)
     displayedKey = key
-    document.title = documentTitle(pathname)
+    applyPageMeta(pathname)
     const saved = positions[key]
     const restore = navType === 'POP' && saved !== undefined && (!firstPage || firstLoadRestores())
     if (restore) window.scrollTo({ top: saved, behavior: 'instant' })
@@ -109,7 +110,6 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
               <Route path="/expertise" element={<Expertise />} />
-              <Route path="/experience" element={<Experience />} />
               <Route path="/research" element={<Research />} />
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/gallery/:section" element={<GallerySectionPage />} />
@@ -118,7 +118,7 @@ export default function App() {
               {Object.entries(legacyRedirects).map(([from, to]) => (
                 <Route key={from} path={from} element={<Navigate to={to} replace />} />
               ))}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </PageTransition>
         </AnimatePresence>

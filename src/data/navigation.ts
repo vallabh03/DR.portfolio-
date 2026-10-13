@@ -1,5 +1,5 @@
-import { doctor } from './doctor'
-import { findSection } from './gallery'
+import { doctor } from './doctor.ts'
+import { findSection } from './gallery.ts'
 
 /** Testimonials appear only once real, patient-approved testimonials exist. */
 export const showTestimonials = doctor.testimonials.length > 0
@@ -18,10 +18,9 @@ export const navRoutes: NavRoute[] = [
   { path: '/', label: 'Home', title: 'Home', blurb: '' },
   { path: '/about', label: 'About', title: 'About', blurb: 'Background, philosophy and approach to care.' },
   { path: '/expertise', label: 'Expertise', title: 'Expertise', blurb: 'Areas of clinical focus.' },
-  { path: '/experience', label: 'Experience', title: 'Experience', blurb: 'Clinical roles and career timeline.' },
   { path: '/research', label: 'Research', title: 'Research', blurb: 'Publications, studies, academic work and professional credentials.' },
   { path: '/gallery', label: 'Gallery', title: 'Gallery', blurb: 'Awards and conferences, surgery images and surgery videos.' },
-  { path: '/contact', label: 'Contact', title: 'Contact', blurb: 'Where to find the practice and how to get in touch.' },
+  { path: '/contact', label: 'Contact', title: 'Contact', blurb: 'How to get in touch.' },
 ]
 
 export const BOOK_PATH = '/consultation'

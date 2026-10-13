@@ -156,7 +156,8 @@ export const gallerySections: GallerySection[] = [
     intro: 'Photographs from surgical procedures, published with patient consent.',
     kind: 'photos',
     sensitive: true,
-    enabled: true,
+    // Disabled for now; set to true to show the section again.
+    enabled: false,
     items: surgeryImages,
   },
   {

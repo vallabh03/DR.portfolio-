@@ -152,7 +152,7 @@ export const doctor: Doctor = {
     'Assessment, treatment planning and surgery for oral, thyroid, salivary gland and laryngeal cancers, with attention to functional recovery and life after treatment.',
 
   bioShort:
-    'Dr Abhinav Thaduri is an AIIMS-trained Head & Neck Surgical Oncologist practising at Continental Hospitals, Hyderabad. His clinical work focuses on oral cancer, thyroid and parathyroid surgery, salivary gland tumours, and cancers of the larynx and hypopharynx. His academic interests include cancer outcomes, speech and swallowing after treatment, and the long-term wellbeing of patients and families.',
+    'Dr Abhinav Thaduri is an AIIMS-trained Head & Neck Surgical Oncologist practising at Continental Hospitals, Hyderabad. His clinical work focuses on oral cancer, thyroid and parathyroid surgery, salivary gland tumours, cancers of the larynx and hypopharynx, recurrent head and neck cancers, and skin cancers of the head and neck. His academic interests include cancer outcomes, speech and swallowing after treatment, and the long-term wellbeing of patients and families.',
 
   approachStatement:
     'My approach begins with understanding the disease and the person facing it. I explain the diagnosis, available treatment options and expected effects on everyday life so that patients and families can make informed decisions. Treatment planning considers cancer control alongside balancing the quality of life. Where needed, I work with colleagues in radiation oncology, medical oncology, reconstruction and rehabilitation to coordinate care through treatment and follow-up.',
@@ -261,6 +261,27 @@ export const doctor: Doctor = {
       description:
         'Assessment and surgical care for cancers of the voice box and lower throat. Treatment discussions include cancer control and the expected effects on voice, swallowing and breathing.',
     },
+    // The four areas below use the doctor's own wording.
+    {
+      title: 'Recurrent head and neck cancers',
+      description:
+        'Assessment and surgical management of head and neck cancers that return after previous treatment, including surgery, radiotherapy or chemoradiotherapy. Treatment planning considers the site and extent of recurrence, previous treatment, feasibility of salvage surgery and expected functional outcomes.',
+    },
+    {
+      title: 'Paranasal sinus and nasal cavity tumours',
+      description:
+        'Evaluation and surgical treatment of benign and malignant tumours affecting the nasal cavity and paranasal sinuses, including the maxillary and ethmoid sinuses. Surgical planning considers tumour extent, involvement of adjacent structures and the appropriate open, endoscopic or combined surgical approach.',
+    },
+    {
+      title: 'Skin cancers of the head and neck',
+      description:
+        'Evaluation and surgical management of skin cancers involving the face, scalp, ear, neck and surrounding regions, including squamous cell carcinoma, basal cell carcinoma and melanomas. Surgical planning addresses complete tumour removal, regional lymph node involvement when indicated and reconstruction to preserve appearance and function.',
+    },
+    {
+      title: 'Benign neck tumours and neck masses',
+      description:
+        'Evaluation and surgical management of non-cancerous swellings and tumours of the neck, including branchial cleft cysts, thyroglossal duct cysts, dermoid cysts, lipomas and congenital neck masses. Treatment planning considers the underlying diagnosis, anatomical location, relationship to important nerves and blood vessels, and the need for safe surgical removal.',
+    },
     {
       title: 'Head and neck reconstruction',
       description:
@@ -298,70 +319,61 @@ export const doctor: Doctor = {
     'Survivorship, financial toxicity & caregiver wellbeing',
   ],
 
+  /**
+   * Publications as supplied by the doctor (13 October 2026), newest first.
+   * Duplicates in the supplied list were merged; fields the list did not give
+   * (journal, year or link) are left out rather than guessed.
+   */
   research: [
     {
-      category: 'Peer-Reviewed Publications',
+      category: 'Publications',
       items: [
-        {
-          title: 'Refining nodal classification in oral cancer: prognostic impact of nodal burden within N2b and implications for AJCC staging',
-          description:
-            'Prognostic evaluation demonstrating that absolute metastatic lymph node count within the AJCC 8th edition N2b category significantly improves survival discrimination in oral cavity squamous cell carcinoma.',
-          year: '2026',
-          venue: 'Oral Oncology',
-          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+A+refining+nodal+classification',
-        },
-        {
-          title: 'Oncological outcomes of pathological extranodal extension (pENE) in oral squamous cell carcinoma (OSCC): A proposal to refine the current staging',
-          description:
-            'Investigation of survival outcomes associated with pathological extranodal extension and positive lymph node thresholds to refine current head and neck cancer staging frameworks.',
-          year: '2025',
-          venue: 'Oral Oncology',
-          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+A+extranodal+extension',
-        },
-        {
-          title: 'Five-year long-term functional and quality of life outcomes in total glossectomy survivors',
-          description:
-            'Long-term evaluation of functional recovery, speech, swallowing, and quality-of-life trajectories in patients undergoing total glossectomy for advanced tongue malignancies.',
-          year: '2025',
-          venue: 'European Archives of Oto-Rhino-Laryngology',
-          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+total+glossectomy',
-        },
-        {
-          title: 'Long-term impact of financial distress and mental well-being in early vs advanced oral cancer patients on the quality of life of informal caregivers',
-          description:
-            'Assessment of the psychological and economic burden of oral cancer treatment on patients and their primary caregivers across disease stages.',
-          year: '2025',
-          venue: 'Supportive Care in Cancer',
-          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+financial+distress+caregivers',
-        },
-        {
-          title: 'Long-term swallow outcomes and factors affecting swallowing dysfunction and quality of life among oral cancer patients: a prospective observational study',
-          description:
-            'Prospective evaluation using the Sydney Swallow Questionnaire (SSQ) analyzing predictors of chronic swallowing dysfunction following multimodality oral cancer therapy.',
-          year: '2023',
-          venue: 'Dysphagia',
-          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+swallow+outcomes+dysphagia',
-        },
-        {
-          title: 'Financial toxicity and mental well-being of the oral cancer survivors residing in a developing country in the era of COVID-19 pandemic',
-          description:
-            'Cross-sectional study analyzing out-of-pocket healthcare expenditure, financial distress, and mental health outcomes in head and neck cancer survivors.',
-          year: '2023',
-          venue: 'Supportive Care in Cancer',
-          link: 'https://pubmed.ncbi.nlm.nih.gov/?term=Thaduri+financial+toxicity+COVID',
-        },
-      ],
-    },
-    {
-      category: 'Academic & Conference Presentations',
-      items: [
-        {
-          title: 'Clinical outcomes, functional preservation, and quality of life in head and neck oncology',
-          description:
-            'Scientific presentations delivered at national and international oncology congresses, including ASCO, ESMO, and FHNO annual meetings.',
-          year: '2022–2025',
-          venue: 'ASCO & ESMO Forums',
-        },
+        { title: "Impact of adjuvant radiotherapy on recurrence outcomes in pT2N0 oral squamous cell carcinoma: a propensity score–matched survival analysis", venue: "Head & Neck", year: '2026', link: 'https://doi.org/10.1002/hed.70391' },
+        { title: "Predictors of nodal metastasis in thin tongue tumours (depth of invasion <5 mm) – revisited", venue: "International Journal of Oral and Maxillofacial Surgery 55, 507–512", year: '2026' },
+        { title: "Refining nodal classification in oral cancer: prognostic impact of nodal burden within N2b and implications for AJCC staging" },
+        { title: "Development of a nodal burden–extranodal extension classification for pathological nodal staging in oral cavity squamous cell carcinoma" },
+        { title: "Level V metastases in node-positive oral squamous cell carcinoma: beyond level IIA", link: 'https://doi.org/10.1159/000543140' },
+        { title: "Five-year long-term functional and quality of life outcomes in total glossectomy survivors", venue: "European Archives of Oto-Rhino-Laryngology 282, 2063–2070", year: '2025', link: 'https://doi.org/10.1007/s00405-024-09059-0' },
+        { title: "Addressing quality of life and rehabilitation outcomes in total glossectomy survivors", venue: "European Archives of Oto-Rhino-Laryngology 282, 2181–2182", year: '2025', link: 'https://doi.org/10.1007/s00405-024-09201-y' },
+        { title: "Oncological outcomes of pathological extranodal extension (pENE) in oral squamous cell carcinoma (OSCC): a proposal to refine the current staging", venue: "Oral Oncology", year: '2025', link: 'https://doi.org/10.1016/j.oraloncology.2025.107281' },
+        { title: "Clinico-pathological significance of tumor infiltrating immune cells in oral squamous cell carcinoma – hope or hype?", venue: "Head & Neck 47, 1706–1716", year: '2025', link: 'https://doi.org/10.1002/hed.28083' },
+        { title: "Can elective neck dissection for oral cancer be planned on the basis of depth of invasion? Retrospective analysis", venue: "JCO Global Oncology 11, e2400451", year: '2025', link: 'https://doi.org/10.1200/GO-24-00451' },
+        { title: "Long-term impact of financial distress and mental well-being in early vs advanced oral cancer patients on the quality of life of informal caregivers: an exploratory study of a real-world cohort from LMIC", venue: "Journal of Cancer Research and Therapeutics 21(1), 91–97", year: '2025', link: 'https://doi.org/10.4103/jcrt.jcrt_709_24' },
+        { title: "Authors’ reply to Kansal et al.", venue: "Cancer Research, Statistics, and Treatment 8(1), 82–83", year: '2025', link: 'https://doi.org/10.4103/crst.crst_40_25' },
+        { title: "424P Prognostic implications of histological bone involvement in oral squamous cell carcinoma: a comparative analysis", venue: "Annals of Oncology", year: '2024', link: 'https://doi.org/10.1016/j.annonc.2024.10.447' },
+        { title: "Real-world data analysis of oncological outcomes in patients with pathological extranodal extension (ENE) in OSCC: a proposal to refine the pathological nodal staging system", venue: "Annals of Oncology 35, S648–S649" },
+        { title: "Predictors of extra nodal extension in oral squamous cell carcinoma: a retrospective analysis", venue: "Cancer Research, Statistics, and Treatment 7(4), 421–427", year: '2024', link: 'https://doi.org/10.4103/crst.crst_51_24' },
+        { title: "A real-world analysis of oncological outcomes in patients with oral squamous cell carcinoma requiring marginal mandibulectomy for achieving clear surgical margins", venue: "South Asian Journal of Cancer", year: '2024' },
+        { title: "Can elective neck dissection for oral cancers be planned based on depth of invasion?", venue: "Journal of Clinical Oncology 42(16 suppl), e18042", year: '2024', link: 'https://doi.org/10.1200/JCO.2024.42.16_suppl.e18042' },
+        { title: "Supraclavicular artery island flap in head-and-neck reconstruction: our experience", venue: "Journal of Head & Neck Physicians and Surgeons 11(2), 102–106", year: '2023', link: 'https://doi.org/10.4103/jhnps.jhnps_37_23' },
+        { title: "Effect of financial distress and mental well-being of patients with early vs advanced oral cancer on informal caregiver’s quality of life: a prospective real-world data from public health sector hospital", venue: "Annals of Oncology 34, S1611" },
+        { title: "Exploring the landscape of oral cancer care: real-world scenario", venue: "European Archives of Oto-Rhino-Laryngology 280(11), 5151–5152", year: '2023', link: 'https://doi.org/10.1007/s00405-023-08215-2' },
+        { title: "Long-term swallow outcomes and factors affecting swallowing dysfunction and quality of life among oral cancer patients: a prospective observational study", venue: "European Archives of Oto-Rhino-Laryngology 280(11), 5091–5100", year: '2023', link: 'https://doi.org/10.1007/s00405-023-08155-x' },
+        { title: "Financial toxicity and mental well-being of the oral cancer survivors residing in a developing country in the era of COVID-19 pandemic – a cross-sectional study", venue: "Psycho-Oncology 32(1), 58–67", year: '2023', link: 'https://doi.org/10.1002/pon.6030' },
+        { title: "A longitudinal cohort study on assessing the impact of COVID-19 pandemic on the mental health of cancer care providers: developing world scenario", venue: "Journal of Head & Neck Physicians and Surgeons 11(1), 59–65", year: '2023', link: 'https://doi.org/10.4103/jhnps.jhnps_45_22' },
+        { title: "Revisiting the predictive factors for nodal metastasis in oral cancers – a leap towards personalized patient treatment approach", venue: "Indian Journal of Surgical Oncology 14(2), 392–397", year: '2023', link: 'https://doi.org/10.1007/s13193-022-01701-9' },
+        { title: "Radiological tumor thickness as a clinical predictor of pathological depth of invasion in oral squamous cell carcinoma: a retrospective analysis", venue: "European Archives of Oto-Rhino-Laryngology 280(3), 1417–1423", year: '2023', link: 'https://doi.org/10.1007/s00405-022-07692-1' },
+        { title: "Analysis of the role of selective neck dissection in clinically node-positive T3/T4 oral cancers", venue: "BioMed Research International 2022, 2204745", year: '2022', link: 'https://doi.org/10.1155/2022/2204745' },
+        { title: "Addressing the challenges of head and neck cancer care in India – a compelling need of the hour", venue: "Oral Oncology 124, 105638", year: '2022', link: 'https://doi.org/10.1016/j.oraloncology.2021.105638' },
+        { title: "Robot assisted modified retro-auricular approach for posterior triangle of neck: the path differently taken", venue: "Oral Oncology 124, 105633", year: '2022', link: 'https://doi.org/10.1016/j.oraloncology.2021.105633' },
+        { title: "Clinicopathological difference between gingivobuccal and oral tongue cancers: a cross-sectional observational study from a tertiary healthcare centre in northern India", venue: "Indian Journal of Otolaryngology and Head & Neck Surgery", year: '2022', link: 'https://doi.org/10.1007/s12070-021-03025-6' },
+        { title: "Approach to T4b oral cancers – a surgeon’s perspective", venue: "Journal of Head & Neck Physicians and Surgeons 10(2), 127–131", year: '2022', link: 'https://doi.org/10.4103/jhnps.jhnps_46_22' },
+        { title: "239P Prospective evaluation of difference in patient-reported swallowing outcomes and quality of life of tongue vs bucco-alveolar complex cancers treated with ablative surgery", venue: "Annals of Oncology 33, S1527" },
+        { title: "1492P A longitudinal cohort study on assessing the impact COVID-19 pandemic on the mental health of cancer care providers: developing world scenario", venue: "Annals of Oncology 32, S1097", year: '2021', link: 'https://doi.org/10.1016/j.annonc.2021.08.820' },
+        { title: "Mixed invasive fungal infections among COVID-19 patients", venue: "Current Medical Mycology 7(4), 19–27", year: '2021', link: 'https://doi.org/10.18502/cmm.7.4.8407' },
+        { title: "Performance and survival outcomes of defect-driven versus specimen-driven method of frozen section intraoperative margin assessment in oral cancers", venue: "International Journal of Oral and Maxillofacial Surgery", year: '2021', link: 'https://doi.org/10.1016/j.ijom.2021.11.010' },
+        { title: "Trans-cervical mandibulotomy approach for a multi-compartmental trigeminal schwannoma: a surgeon’s guide", venue: "Oral Oncology 122, 105572", year: '2021', link: 'https://doi.org/10.1016/j.oraloncology.2021.105572' },
+        { title: "Technical nuances during reconstruction of a complex scalp defect: a pictorial essay", venue: "Indian Journal of Surgery 83, 1547–1551", year: '2021', link: 'https://doi.org/10.1007/s12262-021-02746-w' },
+        { title: "Brown tumor, parathyroid adenoma, and papillary thyroid cancer: a triple whammy", venue: "Oral Oncology 116, 105159", year: '2021', link: 'https://doi.org/10.1016/j.oraloncology.2020.105159' },
+        { title: "Oral cancer screening – a delphic horizon in India", venue: "Oral Oncology, 105174", year: '2021', link: 'https://doi.org/10.1016/j.oraloncology.2020.105174' },
+        { title: "Lymph node ratio in oral cavity cancer and its impact on mortality and disease recurrence", venue: "Oral Oncology 111, 104880", year: '2020', link: 'https://doi.org/10.1016/j.oraloncology.2020.104880' },
+        { title: "Letter to the Editor: Relevance of level IIb neck dissection in patients with head and neck squamous cell carcinomas", venue: "World Journal of Surgery 44(5), 1691–1692", year: '2020', link: 'https://doi.org/10.1007/s00268-020-05448-8' },
+        { title: "Invasive fungal granuloma: a diagnostic challenge", venue: "International Journal of Otorhinolaryngology and Head and Neck Surgery 6(8), 1529–1532", year: '2020' },
+        { title: "Management of invasive fungal rhino sinusitis in a tertiary health care center", venue: "International Journal of Otorhinolaryngology and Head and Neck Surgery 4(6), 1468–1472", year: '2018' },
+        { title: "A study of correlation between CT findings and MMA findings in cases of maxillary sinusitis", venue: "Journal of Medical Science and Clinical Research 6(10)", year: '2018', link: 'http://jmscr.igmpublication.org/home/index.php/archive/155-volume-06-issue-10-october-2018/5942-a-study-of-correlation-between-ct-findings-and-mma-findings-in-cases-of-maxillary-sinusitis' },
+        { title: "Prevalence of head and neck cancers – an institutional based study", venue: "IOSR Journal of Dental and Medical Sciences 17(10)", link: 'https://www.iosrjournals.org/iosr-jdms/papers/Vol17-issue10/version-9/I1710093443.pdf' },
+        { title: "Epidemiology of various aetiologies for emergency tracheostomy in tertiary ENT hospital", venue: "IOSR Journal of Dental and Medical Sciences 17(10)", link: 'http://www.iosrjournals.org/iosr-jdms/papers/Vol17-issue10/Version-4/D1710041722.pdf' },
+        { title: "A comparative study between different surgical techniques for preauricular sinus at tertiary care centre, Secunderabad, Telangana" },
       ],
     },
   ] as ResearchGroup[],
@@ -374,8 +386,8 @@ export const doctor: Doctor = {
     addressLine: 'Plot No 3, Road No. 2, Financial District',
     locality: 'Gachibowli, Nanakramguda, Telangana',
     postcode: '500032',
-    phone: '',
-    email: '',
+    phone: '+91 77801 61363',
+    email: 'dr.abhinavthaduri.hnonco@gmail.com',
     hours: [{ days: 'Monday–Saturday', time: '9 AM–5 PM' }],
     // Opens the location in Google Maps (directions); the Contact page map loads only on request.
     mapUrl: 'https://www.google.com/maps/search/?api=1&query=Continental+Hospitals%2C+Plot+No+3%2C+Road+No.+2%2C+Financial+District%2C+Gachibowli%2C+Nanakramguda%2C+Telangana+500032',
@@ -413,5 +425,5 @@ const hasHonorific = /^Dr\.?$/i.test(honorific)
 /** "Dr. Thaduri": honorific and family name, for links such as "About Dr. Thaduri". */
 export const shortName = hasHonorific ? `${honorific} ${givenAndFamily[givenAndFamily.length - 1]}` : doctor.name
 
-/** The About page heading, as two lines: "About Dr." / "Abhinav Thaduri". */
-export const aboutHeading: [string, string] = hasHonorific ? [`About ${honorific}`, givenAndFamily.join(' ')] : ['About', doctor.name]
+/** The About page heading, as two lines: "About" / "Dr Abhinav Thaduri", keeping the honorific with the name. */
+export const aboutHeading: [string, string] = ['About', doctor.name]
