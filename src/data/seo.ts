@@ -14,7 +14,7 @@ import { visibleSections } from './gallery.ts'
  * It must match the domain the site is served from; canonical links, the
  * sitemap, robots.txt and social previews all derive from it.
  */
-export const SITE_URL = 'https://www.drabhinavthaduri.com'
+export const SITE_URL = 'https://www.drabhinavthaduri.in'
 
 /** Shared preview image for links (1200 × 630). */
 export const OG_IMAGE = { path: '/og-image.jpg', width: 1200, height: 630, alt: `${doctor.name}, ${doctor.title}` }

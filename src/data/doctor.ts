@@ -404,7 +404,7 @@ export const doctor: Doctor = {
   },
 
   seo: {
-    siteUrl: 'https://www.drabhinavthaduri.com',
+    siteUrl: 'https://www.drabhinavthaduri.in',
   },
 }
 
