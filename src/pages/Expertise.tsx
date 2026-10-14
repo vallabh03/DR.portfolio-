@@ -7,13 +7,10 @@ import { EASE_IN_OUT, useDecorativeMotion, useEntrance } from '../lib/motion'
 import RevealText from '../components/RevealText'
 import { REGION_LABEL, regionFor } from '../data/regions'
 import MedicalImage from '../components/MedicalImage'
-import imageManifest from '../data/image-manifest.json'
 import { ArrowRight } from '../components/Button'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const areaId = (i: number) => `area-${i + 1}`
-/** Intrinsic sizes of the optimised images, keyed by path. */
-const manifest = imageManifest as Record<string, { width: number; height: number }>
 
 /** The areas that can be published: those with a confirmed title. */
 const areas = doctor.expertise.filter((e) => hasValue(e.title))
@@ -266,22 +263,20 @@ function AreaBlock({ index, title, description, details, detailsLabel, image }: 
 
 /**
  * The area's image in a card that drifts gently upward as the area scrolls
- * past. The card takes the image's own proportions, so labels at the edges are
- * never cropped, and is never wider than the image itself, so a small image
- * stays sharp. Until an image is supplied a 3:2 placeholder holds its place.
+ * past. Every card has the same 4:5 shape, sized to fit the screen's height,
+ * so all areas look alike; each photograph fills its card, cropped from the
+ * centre. The placeholder takes the same shape until an image is supplied.
  */
 function AreaImage({ index, title, image }: { index: number; title: string; image?: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  const size = image ? manifest[image] : undefined
-  const aspectRatio = size ? `${size.width} / ${size.height}` : '3 / 2'
   const animated = useDecorativeMotion()
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   const y = useTransform(scrollYProgress, [0, 1], animated ? [60, -60] : [0, 0])
 
   return (
     <div ref={ref} className="mt-10 lg:mt-0">
-      <motion.figure style={{ y, maxWidth: size?.width }} className="mx-auto overflow-hidden rounded-2xl bg-[var(--s-card)] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
-        <div style={{ aspectRatio }}>
+      <motion.figure style={{ y, maxWidth: 'calc(72svh * 4 / 5)' }} className="mx-auto w-full overflow-hidden rounded-2xl bg-[var(--s-card)] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+        <div className="aspect-[4/5]">
           <MedicalImage
             src={image}
             sizes="(min-width: 1024px) 50vw, 100vw"

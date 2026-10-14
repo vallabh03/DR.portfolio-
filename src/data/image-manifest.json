@@ -57,6 +57,22 @@
     ],
     "base": "/images/optimized/expertise-larynx"
   },
+  "/images/expertise-neck.jpg": {
+    "width": 3559,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3559
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-neck"
+  },
   "/images/expertise-oral-cancer.jpg": {
     "width": 3840,
     "height": 3085,
@@ -122,14 +138,14 @@
     "base": "/images/optimized/expertise-skin"
   },
   "/images/expertise-thyroid.jpg": {
-    "width": 3559,
+    "width": 2315,
     "height": 3840,
     "widths": [
       640,
       960,
       1280,
       1920,
-      3559
+      2315
     ],
     "formats": [
       "avif",
