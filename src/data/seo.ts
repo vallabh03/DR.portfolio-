@@ -1,6 +1,7 @@
 import { doctor, hasValue, QUALIFICATIONS } from './doctor.ts'
 import { BOOK_PATH, documentTitle } from './navigation.ts'
 import { visibleSections } from './gallery.ts'
+import { postPath, publishedPosts } from './blog.ts'
 
 /**
  * Search and sharing details for every page, built from the doctor's data so
@@ -26,7 +27,9 @@ export type PageMeta = {
   /** Kept out of search results (and out of the sitemap). */
   noindex?: boolean
   /** Schema.org type for this page's own WebPage entry. */
-  schemaType?: 'WebPage' | 'AboutPage' | 'ContactPage' | 'MedicalWebPage' | 'CollectionPage'
+  schemaType?: 'WebPage' | 'AboutPage' | 'ContactPage' | 'MedicalWebPage' | 'CollectionPage' | 'BlogPosting'
+  /** Publication date of a blog article (YYYY-MM-DD). */
+  published?: string
 }
 
 const { contact } = doctor
@@ -63,6 +66,16 @@ export const pages: PageMeta[] = [
     title: documentTitle('/research'),
     description: `Research and publications by ${doctor.name} on oral cancer staging, functional recovery and survivorship, with qualifications, training and professional memberships.`,
   },
+  {
+    path: '/blog',
+    title: documentTitle('/blog'),
+    description: `Articles by ${doctor.name}, ${role} at ${practice}, on head and neck cancer care for patients and families.`,
+    schemaType: 'CollectionPage',
+  },
+  // One page per published article.
+  ...publishedPosts.map(
+    (p): PageMeta => ({ path: postPath(p), title: documentTitle(postPath(p)), description: p.summary, schemaType: 'BlogPosting', published: p.date }),
+  ),
   {
     path: '/gallery',
     title: documentTitle('/gallery'),
@@ -193,6 +206,11 @@ export function structuredData(page: PageMeta) {
     about: { '@id': ids.person },
     inLanguage: 'en-IN',
     ...(page.schemaType === 'MedicalWebPage' && { specialty: 'Oncologic', audience: { '@type': 'Patient' } }),
+    ...(page.schemaType === 'BlogPosting' && {
+      headline: page.title.replace(` · ${doctor.name}`, ''),
+      author: { '@id': ids.person },
+      ...(page.published && { datePublished: page.published }),
+    }),
   }
   return { '@context': 'https://schema.org', '@graph': [...siteGraph(), webPage] }
 }

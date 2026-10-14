@@ -18,7 +18,7 @@ export function regionFor(title: string): Region {
 }
 
 export const REGION_LABEL: Record<Region, string> = {
-  oral: 'Oral cavity',
+  oral: 'Oral cavity and oropharynx',
   thyroid: 'Thyroid and parathyroid glands',
   salivary: 'Parotid and submandibular glands',
   larynx: 'Larynx and hypopharynx',

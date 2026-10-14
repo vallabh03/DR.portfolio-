@@ -8,7 +8,6 @@ import MedicalImage from '../components/MedicalImage'
 import { ArrowRight } from '../components/Button'
 import Testimonials from '../components/Testimonials'
 
-const pad = (n: number) => String(n).padStart(2, '0')
 
 /**
  * Props for a section reveal: a short rise and fade, played once as the element
@@ -345,10 +344,7 @@ function ClinicalWork() {
                     initial={animated && switched ? { opacity: 0, y: 10 } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.45, ease: EASE, delay: 0.05 * i }}
-                    className="grid gap-x-5 py-5 first:pt-0 last:pb-0 sm:grid-cols-[2.5rem_1fr]">
-                    <span aria-hidden className="hidden pt-0.5 font-bold tabular-nums text-[var(--b-blue)] sm:block">
-                      {pad(i + 1)}
-                    </span>
+                    className="py-5 first:pt-0 last:pb-0">
                     <div className="min-w-0">
                       <h3 className="text-[1.125rem] font-bold leading-snug text-[var(--b-blue)]">{e.title}</h3>
                       {hasValue(e.meta) && <p className="mt-1 text-sm font-medium text-[var(--b-muted)]">{e.meta}</p>}

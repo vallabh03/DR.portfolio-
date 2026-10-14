@@ -8,6 +8,8 @@ import Home from './pages/Home'
 import About from './pages/About'
 import Expertise from './pages/Expertise'
 import Research from './pages/Research'
+import Blog from './pages/Blog'
+import BlogPost from './pages/BlogPost'
 import Gallery from './pages/Gallery'
 import GallerySectionPage from './pages/GallerySectionPage'
 import Contact from './pages/Contact'
@@ -111,6 +113,8 @@ export default function App() {
               <Route path="/about" element={<About />} />
               <Route path="/expertise" element={<Expertise />} />
               <Route path="/research" element={<Research />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/gallery/:section" element={<GallerySectionPage />} />
               <Route path="/contact" element={<Contact />} />
