@@ -260,12 +260,14 @@ export const doctor: Doctor = {
       title: 'Laryngeal and hypopharyngeal cancers',
       description:
         'Assessment and surgical care for cancers of the voice box and lower throat. Treatment discussions include cancer control and the expected effects on voice, swallowing and breathing.',
+      image: '/images/expertise-larynx.jpg',
     },
     // The four areas below use the doctor's own wording.
     {
       title: 'Recurrent head and neck cancers',
       description:
         'Assessment and surgical management of head and neck cancers that return after previous treatment, including surgery, radiotherapy or chemoradiotherapy. Treatment planning considers the site and extent of recurrence, previous treatment, feasibility of salvage surgery and expected functional outcomes.',
+      image: '/images/expertise-recurrent.jpg',
     },
     {
       title: 'Paranasal sinus and nasal cavity tumours',
@@ -276,6 +278,7 @@ export const doctor: Doctor = {
       title: 'Skin cancers of the head and neck',
       description:
         'Evaluation and surgical management of skin cancers involving the face, scalp, ear, neck and surrounding regions, including squamous cell carcinoma, basal cell carcinoma and melanomas. Surgical planning addresses complete tumour removal, regional lymph node involvement when indicated and reconstruction to preserve appearance and function.',
+      image: '/images/expertise-skin.jpg',
     },
     {
       title: 'Benign neck tumours and neck masses',

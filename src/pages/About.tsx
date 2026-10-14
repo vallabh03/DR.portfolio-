@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react'
-import { Link } from 'react-router'
-import { aboutHeading, doctor, hasValue, publishable, QUALIFICATIONS, TRAINING } from '../data/doctor'
+import { aboutHeading, doctor, hasValue, publishable } from '../data/doctor'
 import { EASE, EASE_EXIT, EASE_IN_OUT, ONCE, useDecorativeMotion, useEntrance } from '../lib/motion'
 import { useScrollTrack } from '../hooks/useScrollTrack'
 import RevealText from '../components/RevealText'
-import CredentialIcon from '../components/CredentialIcon'
 import MedicalImage from '../components/MedicalImage'
 import DrawLine from '../components/DrawLine'
-import { ArrowRight } from '../components/Button'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -25,7 +22,6 @@ export default function About() {
     <>
       <Opener />
       {chapters.length > 0 && <Profile />}
-      <FactFile />
       {/* Shown only once the doctor has supplied and approved the stages */}
       {doctor.approach.some((s) => hasValue(s.title)) && <ApproachToCare />}
     </>
@@ -332,74 +328,6 @@ function ChapterHead({ n, id, title }: { n: number; id: string; title: string })
       </span>
       <RevealText as="h2" id={id} lines={[title]} className="heading-2" />
     </div>
-  )
-}
-
-/* ── 3. Education and training: a CV-style fact file ─────────────────────── */
-
-function FactFile() {
-  const { about } = doctor
-  // Education and training come from the same entries as the credentials on the Experience page.
-  const fromCredentials = (category: string) =>
-    (doctor.credentials.find((g) => g.category === category)?.items ?? [])
-      .filter((c) => hasValue(c.title))
-      .map((c) => ({ title: c.title, detail: [c.institution, c.year].filter(hasValue).join(', ') }))
-  const plain = (values: string[]) => publishable(values).map((title) => ({ title, detail: '' }))
-  // Rows with no confirmed entries are left out; the section is hidden if none remain.
-  const rows = [
-    { title: 'Education', icon: 'education' as const, noun: ['qualification', 'qualifications'], items: fromCredentials(QUALIFICATIONS) },
-    { title: 'Training', icon: 'training' as const, noun: ['programme', 'programmes'], items: fromCredentials(TRAINING) },
-    { title: 'Experience', icon: 'experience' as const, noun: ['role', 'roles'], items: plain(about.experience) },
-    { title: 'Languages', icon: 'languages' as const, noun: ['language', 'languages'], items: plain(about.languages) },
-  ].filter((r) => r.items.length > 0)
-  if (rows.length === 0) return null
-
-  return (
-    <section aria-labelledby="facts-title" className="border-t border-line bg-surface">
-      <div className="container-page section-y">
-        <div className="grid gap-10 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <RevealText as="h2" id="facts-title" lines={['Education and', 'training']} className="heading-2" />
-            <Link to="/research" className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-medium text-accent hover:text-accent-hover">
-              <span className="link-underline">All credentials</span>
-              <ArrowRight />
-            </Link>
-          </div>
-
-          <dl className="lg:col-span-8">
-            {rows.map((r, i) => (
-              <div key={r.title} className="relative grid gap-2 py-6 sm:grid-cols-[12rem_1fr] sm:gap-6 md:py-7">
-                <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={i * 0.1} duration={1} />
-                <dt className="flex items-center gap-4 sm:flex-col sm:items-start sm:gap-3">
-                  <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-                    <CredentialIcon name={r.icon} className="h-6 w-6" />
-                  </span>
-                  <span>
-                    <span className="block font-semibold text-fg">{r.title}</span>
-                    <span className="mt-0.5 block text-sm text-muted">
-                      {r.items.length} {r.noun[r.items.length === 1 ? 0 : 1]}
-                    </span>
-                  </span>
-                </dt>
-                <dd>
-                  <ul className="space-y-3">
-                    {r.items.map((item, j) => (
-                      <li key={j}>
-                        <span className="block text-lg">{item.title}</span>
-                        {item.detail && <span className="mt-0.5 block text-sm text-muted">{item.detail}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </dd>
-              </div>
-            ))}
-            <div aria-hidden className="relative">
-              <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" delay={rows.length * 0.1} duration={1} />
-            </div>
-          </dl>
-        </div>
-      </div>
-    </section>
   )
 }
 

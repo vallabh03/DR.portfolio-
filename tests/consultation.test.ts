@@ -113,6 +113,14 @@ test('fields the visitor did not enter are left out of the message', () => {
   assert.equal(p.details, 'Consent: Yes')
 })
 
+test('email is optional; when left empty the request is accepted and the message says so', async () => {
+  const p = templateParameters({ name: 'A B', phone: '0123456789', email: '', date: '', time: '', message: '' })
+  assert.equal(p.email, 'Not provided')
+  const { res, meta } = await run({ ...valid, email: '', requestId: 'req-no-email-abc' })
+  assert.equal(res.status, 200)
+  assert.equal(meta.calls.length, 1)
+})
+
 test('line breaks in the message become spaces; very long messages are shortened', () => {
   const p = templateParameters({ name: 'A B', phone: '0123456789', email: 'a@b.co', date: '', time: '', message: 'one\n\ntwo\tthree' })
   assert.equal(p.details, 'Reason: one two three · Consent: Yes')

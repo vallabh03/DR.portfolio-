@@ -69,7 +69,7 @@ function validate(v: Values): Errors {
   const e: Errors = {}
   if (v.name.trim().length < 2) e.name = 'Please enter your full name.'
   if (!/^[+()\d\s-]{7,20}$/.test(v.phone.trim()) || v.phone.replace(/\D/g, '').length < 7) e.phone = 'Please enter a valid phone number.'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email.trim())) e.email = 'Please enter a valid email address.'
+  if (v.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email.trim())) e.email = 'Please enter a valid email address.'
   if (v.date && v.date < today()) e.date = 'Please choose a date from today onwards.'
   if (v.message.length > 1000) e.message = 'Please keep your message under 1000 characters.'
   if (!v.consent) e.consent = 'Please confirm so the practice can contact you.'
@@ -93,7 +93,7 @@ const formatTime = (t: string) => TIME_OPTIONS.find((o) => o.value === t)?.label
 const summaryRows = (v: Values): { field: Field; step: number; value: string }[] => [
   { field: 'name', step: 0, value: v.name.trim() },
   { field: 'phone', step: 0, value: v.phone.trim() },
-  { field: 'email', step: 0, value: v.email.trim() },
+  { field: 'email', step: 0, value: v.email.trim() || NOT_SPECIFIED },
   { field: 'date', step: 1, value: formatDate(v.date) },
   { field: 'time', step: 1, value: v.time ? formatTime(v.time) : formatTime('') },
 ]
@@ -359,7 +359,7 @@ function IntakeDocument() {
                       <Row field="phone" required error={errors.phone} index={1}>
                         {(p) => <input {...p} type="tel" inputMode="tel" autoComplete="tel" value={values.phone} onChange={(e) => set('phone', e.target.value)} />}
                       </Row>
-                      <Row field="email" required error={errors.email} index={2}>
+                      <Row field="email" error={errors.email} hint="Optional." index={2}>
                         {(p) => <input {...p} type="email" autoComplete="email" maxLength={254} value={values.email} onChange={(e) => set('email', e.target.value)} />}
                       </Row>
                     </div>
