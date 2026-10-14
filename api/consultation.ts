@@ -55,6 +55,8 @@ export type Consultation = {
   message: string
 }
 
+import { createSupabaseServerClient } from './lib/supabase.ts'
+
 export type Env = Partial<
   Record<
     | 'WHATSAPP_ACCESS_TOKEN'
@@ -63,7 +65,10 @@ export type Env = Partial<
     | 'WHATSAPP_TEMPLATE_NAME'
     | 'WHATSAPP_TEMPLATE_LANGUAGE'
     | 'WHATSAPP_API_VERSION'
-    | 'ALLOWED_ORIGINS',
+    | 'WHATSAPP_DEV_MOCK'
+    | 'ALLOWED_ORIGINS'
+    | 'SUPABASE_URL'
+    | 'SUPABASE_SECRET_KEY',
     string | undefined
   >
 >
@@ -99,13 +104,28 @@ export type Options = {
   /** Used where the platform does not set x-real-ip / x-forwarded-for (local development). */
   clientIp?: string
   log?: Logger
+  /** Test-only: inject a mock Supabase client. */
+  supabaseClient?: {
+    from(table: string): {
+      insert(data: unknown): Promise<{ error: { code: string } | null; data: unknown }>
+      select(columns: string): {
+        eq(key: string, value: string): {
+          single(): Promise<{ data: { notification_status: string; whatsapp_message_id: string | null } | null; error: null }>
+        }
+      }
+      update(data: unknown): {
+        eq(key: string, value: string): Promise<{ error: { code: string } | null }>
+      }
+      raw(sql: string): { raw: string }
+    }
+  }
 }
 
 const defaultStore = createStore()
 
 /* ── Responses ───────────────────────────────────────────────────────────── */
 
-const reply = (status: number, body: { ok: boolean; error?: string }, headers: Record<string, string> = {}) =>
+const reply = (status: number, body: { ok: boolean; error?: string; [key: string]: unknown }, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -143,18 +163,27 @@ function validDate(date: string, now: number) {
   return date >= isoDay(now - 86_400_000)
 }
 
-type Parsed =
+export type BotReason = 'honeypot_filled' | 'timing_too_fast' | 'timing_invalid'
+
+export type Parsed =
   | { kind: 'ok'; data: Consultation; requestId: string }
-  | { kind: 'bot' }
+  | { kind: 'bot'; reason: BotReason; elapsedMs?: number; minFillMs?: number }
   | { kind: 'invalid'; fields: string[] }
 
-export function parseSubmission(body: unknown, now: number): Parsed {
+export function parseSubmission(body: unknown, now: number, minFillMs = MIN_FILL_MS): Parsed {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { kind: 'invalid', fields: ['body'] }
   const b = body as Record<string, unknown>
 
   // Spam signals: the hidden field is filled in (or is not text), or the form was completed implausibly fast.
-  if (Object.hasOwn(b, 'website') && (typeof b.website !== 'string' || clean(b.website).trim() !== '')) return { kind: 'bot' }
-  if (typeof b.elapsedMs !== 'number' || !Number.isFinite(b.elapsedMs) || b.elapsedMs < MIN_FILL_MS) return { kind: 'bot' }
+  if (Object.hasOwn(b, 'website') && (typeof b.website !== 'string' || clean(b.website).trim() !== '')) {
+    return { kind: 'bot', reason: 'honeypot_filled' }
+  }
+  if (typeof b.elapsedMs !== 'number' || !Number.isFinite(b.elapsedMs) || b.elapsedMs < 0) {
+    return { kind: 'bot', reason: 'timing_invalid' }
+  }
+  if (b.elapsedMs < minFillMs) {
+    return { kind: 'bot', reason: 'timing_too_fast', elapsedMs: b.elapsedMs, minFillMs }
+  }
 
   const bad: string[] = []
   // Only the keys the form sends, and every text field must actually be text ('' when left empty).
@@ -214,7 +243,7 @@ export function templateParameters(c: Consultation) {
   return { ...fixed, details: parts.join(' · ') }
 }
 
-type SendResult = { ok: true } | { ok: false; reason: string }
+type SendResult = { ok: true; messageId: string } | { ok: false; reason: string }
 
 async function sendWhatsApp(c: Consultation, env: Required<Pick<Env, RequiredKey>> & Env, fetchImpl: typeof fetch, log: Logger): Promise<SendResult> {
   const version = env.WHATSAPP_API_VERSION && /^v\d+\.\d+$/.test(env.WHATSAPP_API_VERSION) ? env.WHATSAPP_API_VERSION : DEFAULT_API_VERSION
@@ -255,7 +284,9 @@ async function sendWhatsApp(c: Consultation, env: Required<Pick<Env, RequiredKey
     error?: { code?: unknown; error_subcode?: unknown; fbtrace_id?: unknown }
   } | null
 
-  if (res.ok && typeof data?.messages?.[0]?.id === 'string') return { ok: true }
+  if (res.ok && typeof data?.messages?.[0]?.id === 'string') {
+    return { ok: true, messageId: data.messages[0].id }
+  }
 
   // Codes and trace id only: Meta's error text can echo submitted values.
   const e = data?.error
@@ -275,14 +306,14 @@ function trimOldest(map: Map<string, unknown>, max: number) {
   }
 }
 
-function rateLimited(store: Store, key: string, now: number) {
+function rateLimited(store: Store, key: string, now: number, max = RATE_LIMIT_MAX) {
   const recent = (store.hits.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
   recent.push(now)
   // Re-insert so the map stays ordered by last activity.
   store.hits.delete(key)
   store.hits.set(key, recent)
   trimOldest(store.hits, store.maxKeys)
-  return recent.length > RATE_LIMIT_MAX
+  return recent.length > max
 }
 
 /** Removes expired entries. The size cap is applied after this, so expired entries always go first. */
@@ -368,8 +399,11 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
   const raw = await request.text()
   if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return fail(413, 'too_large')
 
+  const isDev = Boolean(env.WHATSAPP_DEV_MOCK)
+  const rateLimitMax = isDev ? 100 : RATE_LIMIT_MAX
+
   pruneExpired(store, now)
-  if (rateLimited(store, `ip:${clientIp(request, opts.clientIp)}`, now)) {
+  if (rateLimited(store, `ip:${clientIp(request, opts.clientIp)}`, now, rateLimitMax)) {
     log.warn('consultation: rate limit reached')
     return fail(429, 'rate_limited', { 'Retry-After': String(RATE_LIMIT_WINDOW_MS / 1000) })
   }
@@ -378,23 +412,97 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
   try {
     body = JSON.parse(raw)
   } catch {
-    return fail(400, 'bad_request')
+    return isDev
+      ? reply(400, { ok: false, error: 'bad_request', reason: 'malformed_json' })
+      : fail(400, 'bad_request')
   }
 
-  const parsed = parseSubmission(body, now)
+  // In development mock mode, permit fast submissions (elapsedMs >= 0).
+  // Production strictly enforces MIN_FILL_MS (2500ms).
+  const minFillMs = isDev ? 0 : MIN_FILL_MS
+  const parsed = parseSubmission(body, now, minFillMs)
   if (parsed.kind === 'bot') {
-    log.warn('consultation: rejected as automated')
-    return fail(400, 'bad_request')
+    if (parsed.reason === 'timing_too_fast') {
+      log.warn(`consultation: rejected as automated (timing: ${parsed.elapsedMs}ms < ${parsed.minFillMs}ms)`)
+    } else if (parsed.reason === 'timing_invalid') {
+      log.warn('consultation: rejected as automated (timing: invalid elapsedMs)')
+    } else {
+      log.warn('consultation: rejected as automated (honeypot field filled)')
+    }
+    return isDev
+      ? reply(400, {
+          ok: false,
+          error: 'bad_request',
+          ...(parsed.reason === 'timing_too_fast'
+            ? { reason: parsed.reason, elapsedMs: parsed.elapsedMs, minFillMs: parsed.minFillMs }
+            : { reason: parsed.reason }),
+        })
+      : fail(400, 'bad_request')
   }
   if (parsed.kind === 'invalid') {
     log.warn(`consultation: invalid fields (${parsed.fields.join(', ')})`)
-    return fail(422, 'invalid')
+    return isDev
+      ? reply(422, { ok: false, error: 'invalid', fields: parsed.fields })
+      : fail(422, 'invalid')
+  }
+
+  // Check Supabase credentials
+  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
+    log.error('consultation: Supabase is not configured (missing SUPABASE_URL or SUPABASE_SECRET_KEY)')
+    return isDev
+      ? reply(503, { ok: false, error: 'unavailable', reason: 'missing_supabase_config' })
+      : fail(503, 'unavailable')
   }
 
   const missing = REQUIRED.filter((k) => !env[k])
   if (missing.length) {
     log.error(`consultation: WhatsApp is not configured (missing ${missing.join(', ')})`)
-    return fail(503, 'unavailable')
+    return isDev
+      ? reply(503, { ok: false, error: 'unavailable', reason: 'missing_whatsapp_config' })
+      : fail(503, 'unavailable')
+  }
+
+  // Use injected Supabase client for testing, otherwise create real one
+  const supabase = opts.supabaseClient ?? (() => {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
+      log.error('consultation: Supabase is not configured (missing SUPABASE_URL or SUPABASE_SECRET_KEY)')
+      throw new Error('unavailable')
+    }
+    return createSupabaseServerClient(env)
+  })()
+
+  // Persist appointment to Supabase with idempotency via request_id unique constraint
+  const { name, phone, email, date, time, message } = parsed.data
+  const { error: insertError } = await supabase.from('appointments').insert({
+    request_id: parsed.requestId,
+    name,
+    phone,
+    email: email || null,
+    preferred_date: date || null,
+    preferred_time: time || null,
+    message: message || null,
+    consent: true,
+    notification_status: 'pending',
+  })
+
+  if (insertError) {
+    if (insertError.code === '23505') { // unique_violation on request_id
+      log.info('consultation: duplicate request id, checking existing record')
+      const { data: existing } = await supabase
+        .from('appointments')
+        .select('notification_status, whatsapp_message_id')
+        .eq('request_id', parsed.requestId)
+        .single()
+
+      if (existing?.notification_status === 'sent' && existing?.whatsapp_message_id) {
+        log.info('consultation: duplicate suppressed (already sent)')
+        return reply(200, { ok: true })
+      }
+      // If pending/failed, continue to retry WhatsApp
+    } else {
+      log.error(`consultation: database error (${insertError.code})`)
+      return fail(503, 'unavailable')
+    }
   }
 
   const idKey = `id:${parsed.requestId}`
@@ -404,12 +512,10 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
   // No await between these checks and claiming the keys, so two concurrent requests cannot both pass.
   const previous = store.sent.get(idKey)
   if (previous && previous.fingerprint !== fingerprint) {
-    // The same request id with different details is never treated as the earlier request.
     log.warn('consultation: request id reused with different details')
     return fail(409, 'conflict')
   }
   if (previous || store.sent.has(fpKey)) {
-    // A retry of a request that already went through, or the same details sent again.
     log.info('consultation: duplicate suppressed')
     return reply(200, { ok: true })
   }
@@ -419,11 +525,48 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
   let result: SendResult
   try {
     result = await sendWhatsApp(parsed.data, env as Required<Pick<Env, RequiredKey>> & Env, opts.fetch ?? fetch, log)
+
+    // Update notification status in database
+    if (result.ok) {
+      try {
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({
+            notification_status: 'sent',
+            notification_sent_at: new Date().toISOString(),
+            whatsapp_message_id: result.messageId,
+          })
+          .eq('request_id', parsed.requestId)
+
+        if (updateError) {
+          log.error(`consultation: failed to update notification status (${updateError.code})`)
+        }
+      } catch (err) {
+        log.error(`consultation: exception updating notification status (${err instanceof Error ? err.name : typeof err})`)
+      }
+    } else {
+      try {
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({
+            notification_status: 'failed',
+            notification_error: result.reason,
+            last_notification_attempt: new Date().toISOString(),
+          })
+          .eq('request_id', parsed.requestId)
+
+        if (updateError) {
+          log.error(`consultation: failed to update notification failure (${updateError.code})`)
+        }
+      } catch (err) {
+        log.error(`consultation: exception updating notification failure (${err instanceof Error ? err.name : typeof err})`)
+      }
+    }
   } finally {
     store.inFlight.delete(idKey)
     store.inFlight.delete(fpKey)
   }
-  // Failures are not recorded, so the same request can be retried.
+
   if (!result.ok) return fail(502, 'delivery_failed')
   recordSent(store, [idKey, fpKey], fingerprint, now)
   log.info('consultation: WhatsApp notification accepted by Meta')

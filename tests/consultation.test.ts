@@ -5,7 +5,9 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { Readable } from 'node:stream'
 import { createStore, handleConsultation, templateParameters, type Env } from '../api/consultation.ts'
+import { createConsultationMiddleware } from '../vite.config.ts'
 
 const NOW = Date.UTC(2026, 9, 6, 12)
 const ORIGIN = 'https://www.example.test'
@@ -17,6 +19,8 @@ const ENV: Env = {
   WHATSAPP_RECIPIENT_NUMBER: '+91 90000 00000',
   WHATSAPP_TEMPLATE_NAME: 'consultation_request',
   WHATSAPP_TEMPLATE_LANGUAGE: 'en',
+  SUPABASE_URL: 'https://test.supabase.co',
+  SUPABASE_SECRET_KEY: 'test-secret-key',
 }
 
 const valid = {
@@ -67,21 +71,83 @@ type RunOptions = {
   logs?: string[]
   log?: Logger
   now?: number
+  supabase?: ReturnType<typeof createSupabaseMock>
 } & Parameters<typeof request>[1]
+
+// Supabase mock for testing
+type SupabaseCall = { table: string; method: string; args: unknown[] }
+
+function createSupabaseMock() {
+  const calls: SupabaseCall[] = []
+  let insertResult: { error: { code: string } | null; data: unknown } = { error: null, data: null }
+  let selectResult: { data: { notification_status: string; whatsapp_message_id: string | null } | null; error: null } = {
+    data: null,
+    error: null,
+  }
+  let updateResult: { error: { code: string } | null } = { error: null }
+
+  const mock = {
+    calls,
+    from(table: string) {
+      return {
+        insert(data: unknown) {
+          calls.push({ table, method: 'insert', args: [data] })
+          return Promise.resolve(insertResult)
+        },
+        select(columns: string) {
+          return {
+            eq(key: string, value: string) {
+              calls.push({ table, method: 'select', args: [columns, key, value] })
+              return {
+                single() {
+                  return Promise.resolve(selectResult)
+                },
+              }
+            },
+          }
+        },
+        update(data: unknown) {
+          return {
+            eq(key: string, value: string) {
+              calls.push({ table, method: 'update', args: [data, key, value] })
+              return Promise.resolve(updateResult)
+            },
+          }
+        },
+        raw(sql: string) {
+          return { raw: sql }
+        },
+      }
+    },
+    __setInsertResult(result: typeof insertResult) {
+      insertResult = result
+    },
+    __setSelectResult(result: typeof selectResult) {
+      selectResult = result
+    },
+    __setUpdateResult(result: typeof updateResult) {
+      updateResult = result
+    },
+  }
+  return mock
+}
 
 async function run(body: unknown, opts: RunOptions = {}) {
   const meta = opts.meta ?? metaStub('sent')
   const logs = opts.logs ?? []
   const log = opts.log ?? { info: (m: string) => logs.push(m), warn: (m: string) => logs.push(m), error: (m: string) => logs.push(m) }
+  const supabaseMock = opts.supabase ?? createSupabaseMock()
+
   const res = await handleConsultation(request(body, opts), {
     env: opts.env ?? ENV,
     store: opts.store ?? createStore(),
     fetch: meta.fetchImpl,
     now: () => opts.now ?? NOW,
     log,
+    supabaseClient: supabaseMock as any,
   })
   const text = await res.text()
-  return { res, text, json: JSON.parse(text) as { ok: boolean; error?: string }, meta, logs }
+  return { res, text, json: JSON.parse(text) as { ok: boolean; error?: string }, meta, logs, supabase: supabaseMock }
 }
 
 test('valid request is sent as the approved template and returns ok', async () => {
@@ -206,6 +272,21 @@ test('spam signals are rejected', async () => {
     assert.equal(res.status, 400)
     assert.equal(meta.calls.length, 0)
   }
+})
+
+test('dev mock mode accepts fast submissions (elapsedMs < MIN_FILL_MS)', async () => {
+  const env = { ...ENV, WHATSAPP_DEV_MOCK: 'sent' }
+  const body = { ...valid, elapsedMs: 100, requestId: 'req-fast-mock-abc' }
+  const { res, meta } = await run(body, { env })
+  assert.equal(res.status, 200)
+  assert.equal(meta.calls.length, 1)
+})
+
+test('production mode rejects fast submissions (elapsedMs < MIN_FILL_MS)', async () => {
+  const body = { ...valid, elapsedMs: 100, requestId: 'req-fast-prod-abc' }
+  const { res, meta } = await run(body)
+  assert.equal(res.status, 400)
+  assert.equal(meta.calls.length, 0)
 })
 
 test('malformed, oversized, cross-origin and wrong-method requests are rejected', async () => {
@@ -398,4 +479,303 @@ test('sent-request memory keeps the most recent requests when full', async () =>
   assert.equal(store.sent.size, 2)
   assert.ok(store.sent.has('id:req-new-0002'))
   assert.ok(!store.sent.has('id:req-old-0001'))
+})
+
+/* ── Supabase persistence ────────────────────────────────────────────────── */
+
+test('successful request persists appointment to Supabase before sending WhatsApp', async () => {
+  const supabase = createSupabaseMock()
+  const { res, meta, supabase: sb } = await run(valid, { supabase })
+
+  assert.equal(res.status, 200)
+  assert.equal(meta.calls.length, 1)
+
+  // Verify Supabase insert was called with correct data
+  const insertCall = sb.calls.find((c) => c.method === 'insert')
+  assert.ok(insertCall, 'Supabase insert should be called')
+  const insertedData = insertCall.args[0] as Record<string, unknown>
+  assert.equal(insertedData.request_id, valid.requestId)
+  assert.equal(insertedData.name, valid.name)
+  assert.equal(insertedData.phone, valid.phone)
+  assert.equal(insertedData.email, valid.email)
+  assert.equal(insertedData.preferred_date, valid.date)
+  assert.equal(insertedData.preferred_time, valid.time)
+  assert.equal(insertedData.message, valid.message)
+  assert.equal(insertedData.consent, true)
+  assert.equal(insertedData.notification_status, 'pending')
+})
+
+test('missing Supabase credentials returns unavailable', async () => {
+  const env = { ...ENV, SUPABASE_URL: '', SUPABASE_SECRET_KEY: '' }
+  const { res, json, meta, logs } = await run(valid, { env })
+
+  assert.equal(res.status, 503)
+  assert.equal(json.error, 'unavailable')
+  assert.equal(meta.calls.length, 0)
+  assert.match(logs.join(), /Supabase is not configured/)
+})
+
+test('database error on insert returns unavailable without calling Meta', async () => {
+  const supabase = createSupabaseMock()
+  supabase.__setInsertResult({ error: { code: '42P01' }, data: null }) // table does not exist
+  const { res, json, meta } = await run(valid, { supabase })
+
+  assert.equal(res.status, 503)
+  assert.equal(json.error, 'unavailable')
+  assert.equal(meta.calls.length, 0)
+})
+
+test('duplicate request id returns ok without sending WhatsApp again if already sent', async () => {
+  const supabase = createSupabaseMock()
+  // First insert fails with unique violation
+  supabase.__setInsertResult({ error: { code: '23505' }, data: null })
+  // Select returns existing record with sent status
+  supabase.__setSelectResult({
+    data: { notification_status: 'sent', whatsapp_message_id: 'wamid.EXISTING' },
+    error: null,
+  })
+
+  const { res, meta } = await run(valid, { supabase })
+
+  assert.equal(res.status, 200)
+  assert.equal(meta.calls.length, 0) // WhatsApp not called
+})
+
+test('duplicate request id with pending status retries WhatsApp', async () => {
+  const supabase = createSupabaseMock()
+  // First insert fails with unique violation
+  supabase.__setInsertResult({ error: { code: '23505' }, data: null })
+  // Select returns existing record with pending status
+  supabase.__setSelectResult({
+    data: { notification_status: 'pending', whatsapp_message_id: null },
+    error: null,
+  })
+
+  const { res, meta } = await run(valid, { supabase })
+
+  assert.equal(res.status, 200)
+  assert.equal(meta.calls.length, 1) // WhatsApp called for retry
+})
+
+test('WhatsApp failure after persistence updates notification status to failed', async () => {
+  const supabase = createSupabaseMock()
+  const { res, supabase: sb } = await run(valid, { supabase, meta: metaStub('rejected') })
+
+  assert.equal(res.status, 502)
+
+  // Verify update was called to mark notification as failed
+  const updateCall = sb.calls.find((c) => c.method === 'update')
+  assert.ok(updateCall, 'Supabase update should be called on WhatsApp failure')
+  const updateData = updateCall.args[0] as Record<string, unknown>
+  assert.equal(updateData.notification_status, 'failed')
+  assert.equal(updateData.notification_error, 'rejected')
+})
+
+test('WhatsApp network failure updates notification status to failed', async () => {
+  const supabase = createSupabaseMock()
+  const { res, supabase: sb } = await run(valid, { supabase, meta: metaStub('network') })
+
+  assert.equal(res.status, 502)
+
+  const updateCall = sb.calls.find((c) => c.method === 'update')
+  assert.ok(updateCall, 'Supabase update should be called on network failure')
+  const updateData = updateCall.args[0] as Record<string, unknown>
+  assert.equal(updateData.notification_status, 'failed')
+  assert.equal(updateData.notification_error, 'network')
+})
+
+test('WhatsApp timeout updates notification status to failed', async () => {
+  const supabase = createSupabaseMock()
+  const { res, supabase: sb } = await run(valid, { supabase, meta: metaStub('timeout') })
+
+  assert.equal(res.status, 502)
+
+  const updateCall = sb.calls.find((c) => c.method === 'update')
+  assert.ok(updateCall, 'Supabase update should be called on timeout')
+  const updateData = updateCall.args[0] as Record<string, unknown>
+  assert.equal(updateData.notification_status, 'failed')
+  assert.equal(updateData.notification_error, 'timeout')
+})
+
+test('successful WhatsApp send updates notification status to sent with message ID', async () => {
+  const supabase = createSupabaseMock()
+  const { res, supabase: sb } = await run(valid, { supabase })
+
+  assert.equal(res.status, 200)
+
+  const updateCall = sb.calls.find((c) => c.method === 'update')
+  assert.ok(updateCall, 'Supabase update should be called on success')
+  const updateData = updateCall.args[0] as Record<string, unknown>
+  assert.equal(updateData.notification_status, 'sent')
+  assert.equal(updateData.whatsapp_message_id, 'wamid.TEST')
+  assert.ok(typeof updateData.notification_sent_at === 'string')
+})
+
+/* ── Regression Tests: Dev Mock Diagnostics, Rejection Paths & Vite Middleware ─ */
+
+test('dev mock returns non-sensitive diagnostic details for honeypot', async () => {
+  const env = { ...ENV, WHATSAPP_DEV_MOCK: 'sent' }
+  const { res, json } = await run({ ...valid, website: 'https://bot.test', requestId: 'req-hp-dev' }, { env })
+  assert.equal(res.status, 400)
+  assert.equal(json.error, 'bad_request')
+  assert.equal((json as Record<string, unknown>).reason, 'honeypot_filled')
+})
+
+test('production mode returns generic 400 for honeypot without diagnostic details', async () => {
+  const { res, json } = await run({ ...valid, website: 'https://bot.test', requestId: 'req-hp-prod' })
+  assert.equal(res.status, 400)
+  assert.equal(json.error, 'bad_request')
+  assert.equal((json as Record<string, unknown>).reason, undefined)
+})
+
+test('dev mock returns non-sensitive diagnostic details for invalid elapsedMs', async () => {
+  const env = { ...ENV, WHATSAPP_DEV_MOCK: 'sent' }
+  const { res, json } = await run({ ...valid, elapsedMs: -50, requestId: 'req-neg-elapsed' }, { env })
+  assert.equal(res.status, 400)
+  assert.equal(json.error, 'bad_request')
+  assert.equal((json as Record<string, unknown>).reason, 'timing_invalid')
+})
+
+test('dev mock mode accepts very fast submissions (e.g. 10ms) without rejection', async () => {
+  const env = { ...ENV, WHATSAPP_DEV_MOCK: 'sent' }
+  const { res, json } = await run({ ...valid, elapsedMs: 10, requestId: 'req-fast-10ms' }, { env })
+  assert.equal(res.status, 200)
+  assert.deepEqual(json, { ok: true })
+})
+
+test('production mode rejects submissions faster than 2500ms with generic 400', async () => {
+  const { res, json } = await run({ ...valid, elapsedMs: 2499, requestId: 'req-prod-fast' })
+  assert.equal(res.status, 400)
+  assert.equal(json.error, 'bad_request')
+  assert.equal((json as Record<string, unknown>).reason, undefined)
+})
+
+test('dev mock returns non-sensitive diagnostic details for malformed JSON', async () => {
+  const env = { ...ENV, WHATSAPP_DEV_MOCK: 'sent' }
+  const { res, json } = await run(null, { env, raw: '{"broken": json' })
+  assert.equal(res.status, 400)
+  assert.equal(json.error, 'bad_request')
+  assert.equal((json as Record<string, unknown>).reason, 'malformed_json')
+})
+
+test('dev mock returns field diagnostics for invalid fields', async () => {
+  const env = { ...ENV, WHATSAPP_DEV_MOCK: 'sent' }
+  const { res, json } = await run({ ...valid, phone: 'invalid', requestId: 'req-inv-fields' }, { env })
+  assert.equal(res.status, 422)
+  assert.equal(json.error, 'invalid')
+  assert.deepEqual((json as Record<string, unknown>).fields, ['phone'])
+})
+
+test('dev mock returns diagnostic for missing Supabase credentials', async () => {
+  const env: Env = { ...ENV, SUPABASE_URL: undefined, SUPABASE_SECRET_KEY: undefined, WHATSAPP_DEV_MOCK: 'sent' }
+  const { res, json } = await run(valid, { env })
+  assert.equal(res.status, 503)
+  assert.equal(json.error, 'unavailable')
+  assert.equal((json as Record<string, unknown>).reason, 'missing_supabase_config')
+})
+
+test('dev mock returns diagnostic for missing WhatsApp credentials when mock is not active', async () => {
+  const env: Env = { ...ENV, WHATSAPP_ACCESS_TOKEN: undefined, WHATSAPP_DEV_MOCK: undefined }
+  const { res, json } = await run(valid, { env })
+  assert.equal(res.status, 503)
+  assert.equal(json.error, 'unavailable')
+  assert.equal((json as Record<string, unknown>).reason, undefined)
+})
+
+type MockResponse = {
+  statusCode: number
+  headers: Record<string, string>
+  setHeader(name: string, value: string): void
+  end(body?: string): void
+  body: string
+}
+
+function createMockRes(): MockResponse {
+  const headers: Record<string, string> = {}
+  let body = ''
+  return {
+    statusCode: 200,
+    headers,
+    setHeader(name: string, value: string) {
+      headers[name.toLowerCase()] = value
+    },
+    end(chunk?: string) {
+      if (chunk) body += chunk
+    },
+    get body() {
+      return body
+    },
+  }
+}
+
+function createMockReq(body: unknown, options: { url?: string; method?: string; origin?: string } = {}) {
+  const raw = typeof body === 'string' ? body : JSON.stringify(body)
+  const stream = Readable.from([Buffer.from(raw)]) as any
+  stream.url = options.url ?? '/api/consultation'
+  stream.method = options.method ?? 'POST'
+  stream.headers = {
+    host: 'localhost:5173',
+    origin: options.origin ?? 'http://localhost:5173',
+    'content-type': 'application/json',
+    'content-length': String(Buffer.byteLength(raw)),
+  }
+  stream.socket = { remoteAddress: '127.0.0.1' }
+  return stream
+}
+
+test('Vite consultation middleware processes valid request in development mode', async () => {
+  const supabase = createSupabaseMock()
+  const middleware = createConsultationMiddleware('development', {
+    store: createStore(),
+    supabaseClient: supabase as any,
+    env: { WHATSAPP_DEV_MOCK: 'sent' },
+  })
+  const req = createMockReq({ ...valid, requestId: 'req-vite-mw-001' })
+  const res = createMockRes()
+  let nextCalled = false
+
+  await middleware(req, res as any, () => {
+    nextCalled = true
+  })
+
+  assert.equal(nextCalled, false)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.headers['content-type'], 'application/json; charset=utf-8')
+  const json = JSON.parse(res.body)
+  assert.equal(json.ok, true)
+})
+
+test('Vite consultation middleware ignores non-consultation paths and calls next', async () => {
+  const middleware = createConsultationMiddleware('development', { store: createStore() })
+  const req = createMockReq({}, { url: '/api/something-else' })
+  const res = createMockRes()
+  let nextCalled = false
+
+  await middleware(req, res as any, () => {
+    nextCalled = true
+  })
+
+  assert.equal(nextCalled, true)
+  assert.equal(res.body, '')
+})
+
+test('Vite consultation middleware catches honeypot submission and returns diagnostic detail', async () => {
+  const middleware = createConsultationMiddleware('development', {
+    store: createStore(),
+    env: { WHATSAPP_DEV_MOCK: 'sent' },
+  })
+  const req = createMockReq({ ...valid, website: 'http://bot.test', requestId: 'req-vite-mw-hp' })
+  const res = createMockRes()
+  let nextCalled = false
+
+  await middleware(req, res as any, () => {
+    nextCalled = true
+  })
+
+  assert.equal(nextCalled, false)
+  assert.equal(res.statusCode, 400)
+  const json = JSON.parse(res.body)
+  assert.equal(json.ok, false)
+  assert.equal(json.error, 'bad_request')
+  assert.equal(json.reason, 'honeypot_filled')
 })
