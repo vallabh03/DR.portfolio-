@@ -210,6 +210,18 @@
     max-width: 65ch;
   }
 
+  /* Gallery video row (src/components/VideoStrip.tsx): drifts left in a loop */
+  .video-strip {
+    mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  }
+  .video-strip-track {
+    animation: video-strip linear infinite;
+  }
+  /* It keeps moving under the pointer (and on every device setting); it pauses only while a card has keyboard focus */
+  .video-strip:focus-within .video-strip-track {
+    animation-play-state: paused;
+  }
+
   /* Blog article text (src/components/Markdown.tsx) */
   .article-body {
     font-size: 1.0625rem;
@@ -425,4 +437,14 @@ input[type='time']::-webkit-calendar-picker-indicator {
 [data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
 [data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator {
   filter: invert(1);
+}
+
+@keyframes video-strip {
+  from {
+    transform: translateX(0);
+  }
+  /* The row holds two copies of the list, so moving by half loops seamlessly */
+  to {
+    transform: translateX(-50%);
+  }
 }
