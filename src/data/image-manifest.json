@@ -41,6 +41,38 @@
     ],
     "base": "/images/optimized/doctor-hero"
   },
+  "/images/expertise-larynx-1.jpg": {
+    "width": 3624,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3624
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-larynx-1"
+  },
+  "/images/expertise-larynx-2.jpg": {
+    "width": 3369,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3369
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-larynx-2"
+  },
   "/images/expertise-larynx.jpg": {
     "width": 3072,
     "height": 3840,
@@ -56,6 +88,54 @@
       "webp"
     ],
     "base": "/images/optimized/expertise-larynx"
+  },
+  "/images/expertise-maxilla-1.jpg": {
+    "width": 2160,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2160
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-maxilla-1"
+  },
+  "/images/expertise-maxilla-2.jpg": {
+    "width": 2160,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2160
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-maxilla-2"
+  },
+  "/images/expertise-maxilla-3.jpg": {
+    "width": 2880,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2880
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-maxilla-3"
   },
   "/images/expertise-neck.jpg": {
     "width": 3559,
@@ -73,6 +153,38 @@
     ],
     "base": "/images/optimized/expertise-neck"
   },
+  "/images/expertise-oral-cancer-2.jpg": {
+    "width": 2202,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      2202
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-oral-cancer-2"
+  },
+  "/images/expertise-oral-cancer-3.jpg": {
+    "width": 3951,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3951
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-oral-cancer-3"
+  },
   "/images/expertise-oral-cancer.jpg": {
     "width": 3840,
     "height": 3085,
@@ -88,6 +200,38 @@
       "webp"
     ],
     "base": "/images/optimized/expertise-oral-cancer"
+  },
+  "/images/expertise-recurrent-1.jpg": {
+    "width": 3444,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3444
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-recurrent-1"
+  },
+  "/images/expertise-recurrent-2.jpg": {
+    "width": 3840,
+    "height": 2160,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3840
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-recurrent-2"
   },
   "/images/expertise-recurrent.jpg": {
     "width": 3597,
@@ -120,6 +264,38 @@
       "webp"
     ],
     "base": "/images/optimized/expertise-salivary"
+  },
+  "/images/expertise-skin-1.jpg": {
+    "width": 3840,
+    "height": 3543,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3840
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-skin-1"
+  },
+  "/images/expertise-skin-2.jpg": {
+    "width": 3840,
+    "height": 2160,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3840
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-skin-2"
   },
   "/images/expertise-skin.jpg": {
     "width": 3072,

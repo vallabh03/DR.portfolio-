@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { AnimatePresence, motion, useScroll, useTransform } from 'motion/react'
+import { AnimatePresence, motion, useInView, useScroll, useTransform } from 'motion/react'
 import { Link } from 'react-router'
 import { doctor, hasValue, publishable } from '../data/doctor'
 import { BOOK_PATH } from '../data/navigation'
@@ -12,8 +12,16 @@ import { ArrowRight } from '../components/Button'
 const pad = (n: number) => String(n).padStart(2, '0')
 const areaId = (i: number) => `area-${i + 1}`
 
-/** The areas that can be published: those with a confirmed title. */
-const areas = doctor.expertise.filter((e) => hasValue(e.title))
+/** How many photographs an area has (its image plus any further ones). */
+const photoCount = (e: (typeof doctor.expertise)[number]) => [e.image, ...(e.moreImages ?? [])].filter(hasValue).length
+
+/**
+ * The areas that can be published (those with a confirmed title), ordered by
+ * their photographs: slideshows first, then single photographs, then areas
+ * without one. Within each group the doctor's own order is kept.
+ */
+const rank = (n: number) => (n > 1 ? 0 : n === 1 ? 1 : 2)
+const areas = doctor.expertise.filter((e) => hasValue(e.title)).sort((a, b) => rank(photoCount(a)) - rank(photoCount(b)))
 
 /**
  * Expertise: a showcase of the areas of care. On a deep blue band, a sticky
@@ -154,7 +162,7 @@ function Showcase({ active }: { active: number }) {
 
           <div className="lg:col-span-7">
             {areas.map((a, i) => (
-              <AreaBlock key={i} index={i} title={a.title} description={a.description} details={publishable(a.details)} detailsLabel={a.detailsLabel} image={a.image} />
+              <AreaBlock key={i} index={i} title={a.title} description={a.description} details={publishable(a.details)} detailsLabel={a.detailsLabel} image={a.image} more={a.moreImages} />
             ))}
           </div>
         </div>
@@ -222,8 +230,9 @@ function WipePanel({ index, title, description, details, detailsLabel }: { index
 }
 
 /** One area: its text (shown on phones and tablets, read by screen readers everywhere) and its image. */
-function AreaBlock({ index, title, description, details, detailsLabel, image }: { index: number; title: string; description: string; details: string[]; detailsLabel?: string; image?: string }) {
+function AreaBlock({ index, title, description, details, detailsLabel, image, more }: { index: number; title: string; description: string; details: string[]; detailsLabel?: string; image?: string; more?: string[] }) {
   const region = regionFor(title)
+  const photos = [image, ...(more ?? [])].filter(hasValue)
   return (
     <article
       id={areaId(index)}
@@ -251,7 +260,8 @@ function AreaBlock({ index, title, description, details, detailsLabel, image }: 
             </>
           )}
         </div>
-        <AreaImage index={index} title={title} image={hasValue(image) ? image : undefined} />
+        {/* An area without a photograph shows no image box at all */}
+        {photos.length > 0 && <AreaImage index={index} title={title} images={photos} />}
         <Link to={BOOK_PATH} className="group/btn mt-8 inline-flex min-h-11 items-center gap-2 font-semibold text-[var(--s-accent)] lg:hidden">
           <span className="link-underline">Discuss this in a consultation</span>
           <ArrowRight />
@@ -267,7 +277,7 @@ function AreaBlock({ index, title, description, details, detailsLabel, image }: 
  * so all areas look alike; each photograph fills its card, cropped from the
  * centre. The placeholder takes the same shape until an image is supplied.
  */
-function AreaImage({ index, title, image }: { index: number; title: string; image?: string }) {
+function AreaImage({ index, title, images }: { index: number; title: string; images: string[] }) {
   const ref = useRef<HTMLDivElement>(null)
   const animated = useDecorativeMotion()
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
@@ -275,19 +285,133 @@ function AreaImage({ index, title, image }: { index: number; title: string; imag
 
   return (
     <div ref={ref} className="mt-10 lg:mt-0">
-      <motion.figure style={{ y, maxWidth: 'calc(72svh * 4 / 5)' }} className="mx-auto w-full overflow-hidden rounded-2xl bg-[var(--s-card)] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
-        <div className="aspect-[4/5]">
-          <MedicalImage
-            src={image}
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            alt={`${title}, illustrative image`}
-            placeholderLabel={`Expertise ${pad(index + 1)}`}
-            hoverZoom={false}
-            className="h-full w-full"
-          />
+      <motion.figure style={{ y, maxWidth: 'calc(72svh * 4 / 5)' }} className="relative mx-auto w-full overflow-hidden rounded-2xl bg-[var(--s-card)] shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+        <div className="relative aspect-[4/5]">
+          {images.length > 1 ? (
+            <Slides title={title} images={images} />
+          ) : (
+            <MedicalImage
+              src={images[0]}
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              alt={`${title}, illustrative image`}
+              placeholderLabel={`Expertise ${pad(index + 1)}`}
+              hoverZoom={false}
+              className="h-full w-full"
+            />
+          )}
         </div>
       </motion.figure>
     </div>
+  )
+}
+
+const SLIDE_MS = 2800
+
+/**
+ * Several photographs for one area, shown one at a time. They slide on by
+ * themselves while the card is on screen (pausing on hover or focus, and not at
+ * all under reduced motion); arrows, dots and a swipe move between them too.
+ */
+function Slides({ title, images }: { title: string; images: string[] }) {
+  const [[current, direction], setSlide] = useState<[number, number]>([0, 1])
+  const [paused, setPaused] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const inView = useInView(boxRef, { amount: 0.4 })
+  const animated = useDecorativeMotion()
+  const go = (step: number) => setSlide(([c]) => [(c + step + images.length) % images.length, step])
+  const goTo = (i: number) => setSlide(([c]) => [i, i >= c ? 1 : -1])
+
+  useEffect(() => {
+    if (!animated || paused || !inView) return
+    // Skipped while the tab is in the background, so slides do not pile up unseen.
+    const t = window.setInterval(() => !document.hidden && go(1), SLIDE_MS)
+    return () => window.clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, paused, inView, animated])
+
+  return (
+    <div
+      ref={boxRef}
+      role="group"
+      aria-roledescription="carousel"
+      aria-label={`${title}: photographs`}
+      className="absolute inset-0"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      <AnimatePresence initial={false} custom={direction}>
+        <motion.div
+          key={current}
+          custom={direction}
+          className="absolute inset-0 touch-pan-y"
+          variants={{
+            enter: (d: number) => ({ x: animated ? `${d * 100}%` : 0, opacity: animated ? 1 : 0 }),
+            center: { x: 0, opacity: 1 },
+            exit: (d: number) => ({ x: animated ? `${d * -100}%` : 0, opacity: animated ? 1 : 0 }),
+          }}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: animated ? 0.45 : 0.2, ease: EASE_IN_OUT }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -50) go(1)
+            else if (info.offset.x > 50) go(-1)
+          }}
+        >
+          <MedicalImage
+            src={images[current]}
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            alt={`${title}, photograph ${current + 1} of ${images.length}`}
+            hoverZoom={false}
+            reveal={false}
+            className="pointer-events-none h-full w-full"
+          />
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Controls along the bottom edge */}
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black/55 to-transparent px-3 pb-3 pt-10">
+        <SlideButton label="Previous photograph" onClick={() => go(-1)} flip />
+        <div className="flex items-center gap-2">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Show photograph ${i + 1} of ${images.length}`}
+              aria-current={i === current}
+              onClick={() => goTo(i)}
+              className="flex h-6 w-6 items-center justify-center"
+            >
+              <span className={`block h-1.5 rounded-full bg-white transition-all duration-300 ${i === current ? 'w-6 opacity-100' : 'w-1.5 opacity-60'}`} />
+            </button>
+          ))}
+        </div>
+        <SlideButton label="Next photograph" onClick={() => go(1)} />
+      </div>
+      <p className="sr-only" aria-live="polite">
+        Photograph {current + 1} of {images.length}
+      </p>
+    </div>
+  )
+}
+
+function SlideButton({ label, onClick, flip }: { label: string; onClick: () => void; flip?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors duration-300 hover:bg-white/30"
+    >
+      <svg viewBox="0 0 16 16" aria-hidden className={`h-4 w-4 ${flip ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 3l5 5-5 5" />
+      </svg>
+    </button>
   )
 }
 

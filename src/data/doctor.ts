@@ -48,6 +48,8 @@ export type ExpertiseItem = {
   detailsLabel?: string
   /** Illustrative image in /public/images; the area works without one. */
   image?: string
+  /** Further photographs shown after `image`, one at a time in a slideshow. */
+  moreImages?: string[]
 }
 
 export type ResearchItem = {
@@ -239,10 +241,11 @@ export const doctor: Doctor = {
   // Areas of expertise as supplied by the doctor. Images are added per area as they are supplied.
   expertise: [
     {
-      title: 'Oral cancer surgery',
+      title: 'Oral and oropharyngeal surgery',
       description:
         'Assessment and surgical treatment of cancers affecting the tongue, inner cheek, gums, floor of the mouth and other oral cavity sites. Surgical planning addresses tumour removal, neck lymph nodes and reconstruction.',
       image: '/images/expertise-oral-cancer.jpg',
+      moreImages: ['/images/expertise-oral-cancer-2.jpg', '/images/expertise-oral-cancer-3.jpg'],
     },
     {
       title: 'Thyroid and parathyroid surgery',
@@ -260,25 +263,30 @@ export const doctor: Doctor = {
       title: 'Laryngeal and hypopharyngeal cancers',
       description:
         'Assessment and surgical care for cancers of the voice box and lower throat. Treatment discussions include cancer control and the expected effects on voice, swallowing and breathing.',
-      image: '/images/expertise-larynx.jpg',
+      image: '/images/expertise-larynx-1.jpg',
+      moreImages: ['/images/expertise-larynx-2.jpg', '/images/expertise-larynx.jpg'],
     },
     // The four areas below use the doctor's own wording.
     {
       title: 'Recurrent head and neck cancers',
       description:
         'Assessment and surgical management of head and neck cancers that return after previous treatment, including surgery, radiotherapy or chemoradiotherapy. Treatment planning considers the site and extent of recurrence, previous treatment, feasibility of salvage surgery and expected functional outcomes.',
-      image: '/images/expertise-recurrent.jpg',
+      image: '/images/expertise-recurrent-1.jpg',
+      moreImages: ['/images/expertise-recurrent-2.jpg', '/images/expertise-recurrent.jpg'],
     },
     {
       title: 'Paranasal sinus and nasal cavity tumours',
       description:
         'Evaluation and surgical treatment of benign and malignant tumours affecting the nasal cavity and paranasal sinuses, including the maxillary and ethmoid sinuses. Surgical planning considers tumour extent, involvement of adjacent structures and the appropriate open, endoscopic or combined surgical approach.',
+      image: '/images/expertise-maxilla-1.jpg',
+      moreImages: ['/images/expertise-maxilla-2.jpg', '/images/expertise-maxilla-3.jpg'],
     },
     {
       title: 'Skin cancers of the head and neck',
       description:
         'Evaluation and surgical management of skin cancers involving the face, scalp, ear, neck and surrounding regions, including squamous cell carcinoma, basal cell carcinoma and melanomas. Surgical planning addresses complete tumour removal, regional lymph node involvement when indicated and reconstruction to preserve appearance and function.',
-      image: '/images/expertise-skin.jpg',
+      image: '/images/expertise-skin-1.jpg',
+      moreImages: ['/images/expertise-skin-2.jpg', '/images/expertise-skin.jpg'],
     },
     {
       title: 'Benign neck tumours and neck masses',
