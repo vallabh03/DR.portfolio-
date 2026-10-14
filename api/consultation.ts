@@ -173,7 +173,8 @@ export function parseSubmission(body: unknown, now: number): Parsed {
 
   if (name.length < 2 || name.length > LIMITS.name) bad.push('name')
   if (phone.length > LIMITS.phone || !PHONE_RE.test(phone) || phone.replace(/\D/g, '').length < 7) bad.push('phone')
-  if (email.length > LIMITS.email || !EMAIL_RE.test(email)) bad.push('email')
+  // Email is optional; when given it must look like an address.
+  if (email && (email.length > LIMITS.email || !EMAIL_RE.test(email))) bad.push('email')
   if (date && !validDate(date, now)) bad.push('date')
   if (time && !isTimeKey(time)) bad.push('time')
   if (message.length > LIMITS.message) bad.push('message')
@@ -197,7 +198,7 @@ export const formatDate = (iso: string) => {
  * cannot contain line breaks and cannot be empty; consent is always present).
  */
 export function templateParameters(c: Consultation) {
-  const fixed = { name: c.name, phone: c.phone, email: c.email }
+  const fixed = { name: c.name, phone: c.phone, email: c.email || 'Not provided' }
   const parts: string[] = []
   if (c.date) parts.push(`Preferred Date: ${formatDate(c.date)}`)
   if (c.time) parts.push(`Preferred Time: ${TIME_LABELS[c.time]}`)

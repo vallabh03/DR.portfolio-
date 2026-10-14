@@ -41,14 +41,31 @@
     ],
     "base": "/images/optimized/doctor-hero"
   },
-  "/images/expertise-oral-cancer.jpg": {
-    "width": 1536,
-    "height": 1024,
+  "/images/expertise-larynx.jpg": {
+    "width": 3072,
+    "height": 3840,
     "widths": [
       640,
       960,
       1280,
-      1536
+      1920,
+      3072
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-larynx"
+  },
+  "/images/expertise-oral-cancer.jpg": {
+    "width": 3840,
+    "height": 3085,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3840
     ],
     "formats": [
       "avif",
@@ -56,11 +73,31 @@
     ],
     "base": "/images/optimized/expertise-oral-cancer"
   },
-  "/images/expertise-salivary.jpg": {
-    "width": 479,
-    "height": 417,
+  "/images/expertise-recurrent.jpg": {
+    "width": 3597,
+    "height": 3840,
     "widths": [
-      479
+      640,
+      960,
+      1280,
+      1920,
+      3597
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-recurrent"
+  },
+  "/images/expertise-salivary.jpg": {
+    "width": 3657,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3657
     ],
     "formats": [
       "avif",
@@ -68,15 +105,31 @@
     ],
     "base": "/images/optimized/expertise-salivary"
   },
-  "/images/expertise-thyroid.jpg": {
-    "width": 2000,
-    "height": 760,
+  "/images/expertise-skin.jpg": {
+    "width": 3072,
+    "height": 3840,
     "widths": [
       640,
       960,
       1280,
       1920,
-      2000
+      3072
+    ],
+    "formats": [
+      "avif",
+      "webp"
+    ],
+    "base": "/images/optimized/expertise-skin"
+  },
+  "/images/expertise-thyroid.jpg": {
+    "width": 3559,
+    "height": 3840,
+    "widths": [
+      640,
+      960,
+      1280,
+      1920,
+      3559
     ],
     "formats": [
       "avif",

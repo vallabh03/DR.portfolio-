@@ -6,7 +6,6 @@ import { ArrowRight } from '../components/Button'
 import ConsentGate from '../components/ConsentGate'
 import GalleryGrid from '../components/GalleryGrid'
 
-const pad = (n: number) => String(n).padStart(2, '0')
 
 /**
  * Gallery: three sections (awards and conferences, surgery images, surgery
@@ -17,8 +16,8 @@ export default function Gallery() {
   return (
     <>
       <Opening />
-      {visibleSections.map((section, i) => (
-        <SectionPreview key={section.slug} section={section} index={i} />
+      {visibleSections.map((section) => (
+        <SectionPreview key={section.slug} section={section} />
       ))}
     </>
   )
@@ -47,7 +46,7 @@ export function ViewAllLink({ section }: { section: GallerySection }) {
   )
 }
 
-function SectionPreview({ section, index }: { section: GallerySection; index: number }) {
+function SectionPreview({ section }: { section: GallerySection }) {
   const titleId = `gallery-${section.slug}`
   const limit = PREVIEW_COUNT[section.kind]
   return (
@@ -56,8 +55,8 @@ function SectionPreview({ section, index }: { section: GallerySection; index: nu
         <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="font-serif tabular-nums text-brass">{pad(index + 1)}</p>
-            <h2 id={titleId} className="heading-2 mt-2 flex flex-wrap items-center gap-3">
+            {/* The title is read by screen readers; it is shown only for sections that need the 18+ notice */}
+            <h2 id={titleId} className={section.sensitive ? 'heading-2 flex flex-wrap items-center gap-3' : 'sr-only'}>
               {section.title}
               {section.sensitive && (
                 <>
@@ -68,7 +67,6 @@ function SectionPreview({ section, index }: { section: GallerySection; index: nu
                 </>
               )}
             </h2>
-            <p className="measure mt-3 text-muted">{section.intro}</p>
           </div>
           <ViewAllLink section={section} />
         </div>

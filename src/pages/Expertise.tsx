@@ -110,12 +110,8 @@ function Opening() {
             />
           </div>
 
-          {/* The number of areas, and a cue to scroll into them */}
+          {/* A cue to scroll into the areas */}
           <motion.div {...entrance(0.5)} className="flex items-end justify-between gap-8 lg:col-span-4 lg:flex-col lg:items-end lg:justify-end">
-            <p className="lg:text-right">
-              <span className="block font-serif text-[clamp(4rem,3rem+4vw,7rem)] leading-none tabular-nums">{pad(areas.length)}</span>
-              <span className="mt-2 block text-sm font-semibold uppercase tracking-[0.16em] text-[var(--s-muted)]">Areas of care</span>
-            </p>
             <button type="button" onClick={toFirstArea} className="group inline-flex min-h-11 items-center gap-3 text-sm font-semibold text-[var(--s-text)]">
               Scroll to explore
               <span aria-hidden className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--s-accent)] text-[var(--s-accent)] transition-colors duration-300 group-hover:bg-[var(--s-accent)] group-hover:text-[var(--s-bg)]">
