@@ -1,10 +1,11 @@
 import { Link } from 'react-router'
-import { PREVIEW_COUNT, visibleSections, type GallerySection } from '../data/gallery'
+import { PREVIEW_COUNT, visibleSections, youtubeVideos, type GallerySection } from '../data/gallery'
 import RevealText from '../components/RevealText'
 import DrawLine from '../components/DrawLine'
 import { ArrowRight } from '../components/Button'
 import ConsentGate from '../components/ConsentGate'
 import GalleryGrid from '../components/GalleryGrid'
+import VideoStrip from '../components/VideoStrip'
 
 
 /**
@@ -19,7 +20,26 @@ export default function Gallery() {
       {visibleSections.map((section) => (
         <SectionPreview key={section.slug} section={section} />
       ))}
+      {youtubeVideos.length > 0 && <Talks />}
     </>
+  )
+}
+
+/** Talks and interviews on YouTube, drifting past; each opens on YouTube. */
+function Talks() {
+  return (
+    <section aria-labelledby="talks-title" className="container-page pb-16 pt-6 md:pb-24">
+      <div className="relative pt-8">
+        <DrawLine className="absolute inset-x-0 top-0 bg-line-strong" duration={1.1} />
+        <h2 id="talks-title" className="heading-2">
+          Talks and interviews
+        </h2>
+        <p className="measure mt-3 text-muted">Health talks, interviews and academic sessions. Tap a video to watch it on YouTube.</p>
+      </div>
+      <div className="mt-8 md:mt-10">
+        <VideoStrip videos={youtubeVideos} />
+      </div>
+    </section>
   )
 }
 

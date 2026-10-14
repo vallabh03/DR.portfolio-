@@ -175,6 +175,40 @@ export const gallerySections: GallerySection[] = [
 /** The sections currently shown on the site. */
 export const visibleSections = gallerySections.filter((s) => s.enabled)
 
+/* ── Talks and interviews on YouTube ─────────────────────────────────────── */
+
+export type YouTubeVideo = {
+  /** The video's id: the part after youtu.be/ or watch?v= in its link. */
+  id: string
+  /** The title as published on YouTube. */
+  title: string
+  /** The channel that published it. */
+  channel: string
+}
+
+/**
+ * Talks, interviews and health programmes featuring the doctor. Titles and
+ * channels are as published on YouTube. Each card opens the video on YouTube;
+ * nothing is embedded on the site.
+ *
+ * The order keeps look-alike thumbnails apart (including where the row loops
+ * from the last card back to the first): the two "LIVE" talk posters, and the
+ * three with the blue "Dr. Abhinav thaduri" banner, never sit side by side.
+ */
+export const youtubeVideos: YouTubeVideo[] = [
+  { id: '6R-ag4Gc7Ds', title: 'Dark Side of Tobacco: Dr. Abhinav’s Oral Cancer Podcast', channel: 'ManamTv Doctors' },
+  { id: 'RY0AgveNfyY', title: 'గొంతు క్యాన్సర్ బాధితులు పెరుగుతున్నారు!! ఈ లక్షణాలు గుర్తించండి!', channel: 'Prathima Cancer Institute' },
+  { id: 'mZmW-zRz524', title: 'Live health talk on Throat Cancer: Symptoms, Causes and Treatment', channel: 'Prathima Cancer Institute' },
+  { id: 'ZrnBAanwfoo', title: 'Palliative Care is a Specialized Form of Medical Care', channel: 'Prathima Cancer Institute' },
+  { id: '0RZ6v5b_oVk', title: 'Know about Potential Malignance of Oral Cavity', channel: 'Prathima Cancer Institute' },
+  { id: '82WH8S4YBrE', title: 'Thyroid Nodules & their Treatment discussed', channel: 'Prathima Cancer Institute' },
+  { id: '1gcVlwlTDQI', title: 'CME on “New Changing Trends and Spectrum of Head & Neck Oncology”', channel: 'Prathima Cancer Institute' },
+  { id: '92SdKE4_Dwk', title: 'Oral Cancer – Myths and Facts | నోటి క్యాన్సర్ పై అపోహలు - అవగాహన', channel: 'Prathima Cancer Institute' },
+]
+
+export const youtubeUrl = (v: YouTubeVideo) => `https://www.youtube.com/watch?v=${v.id}`
+export const youtubeThumbnail = (v: YouTubeVideo) => `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`
+
 export const findSection = (slug: string | undefined) => visibleSections.find((s) => s.slug === slug)
 
 /** How many items each section shows on the gallery overview before "View all". */
