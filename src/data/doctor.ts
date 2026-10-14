@@ -284,6 +284,7 @@ export const doctor: Doctor = {
       title: 'Benign neck tumours and neck masses',
       description:
         'Evaluation and surgical management of non-cancerous swellings and tumours of the neck, including branchial cleft cysts, thyroglossal duct cysts, dermoid cysts, lipomas and congenital neck masses. Treatment planning considers the underlying diagnosis, anatomical location, relationship to important nerves and blood vessels, and the need for safe surgical removal.',
+      image: '/images/expertise-neck.jpg',
     },
     {
       title: 'Head and neck reconstruction',
