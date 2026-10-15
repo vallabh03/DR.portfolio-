@@ -91,6 +91,8 @@ export type Contact = {
   locality?: string
   postcode?: string
   phone?: string
+  /** WhatsApp number in international form, digits only (e.g. 917780161363), as used in wa.me links. */
+  whatsapp?: string
   email?: string
   hours: { days: string; time: string }[]
   mapUrl?: string
@@ -399,6 +401,7 @@ export const doctor: Doctor = {
     locality: 'Gachibowli, Nanakramguda, Telangana',
     postcode: '500032',
     phone: '+91 77801 61363',
+    whatsapp: '917780161363',
     email: 'dr.abhinavthaduri.hnonco@gmail.com',
     hours: [{ days: 'Monday–Saturday', time: '9 AM–5 PM' }],
     // Opens the location in Google Maps (directions); the Contact page map loads only on request.
@@ -439,3 +442,15 @@ export const shortName = hasHonorific ? `${honorific} ${givenAndFamily[givenAndF
 
 /** The About page heading, as two lines: "About" / "Dr Abhinav Thaduri", keeping the honorific with the name. */
 export const aboutHeading: [string, string] = ['About', doctor.name]
+
+/** The message a WhatsApp chat opens with; the visitor can edit it before sending. */
+export const WHATSAPP_MESSAGE = 'Hello, I would like to enquire about a consultation with Dr. Abhinav Thaduri.'
+
+/**
+ * WhatsApp's official click-to-chat link (https://wa.me/<number>?text=…) with
+ * the message above filled in, or nothing when no number is set. No API or
+ * account is involved: the link simply opens WhatsApp.
+ */
+export const whatsappUrl = hasValue(doctor.contact.whatsapp)
+  ? `https://wa.me/${doctor.contact.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`
+  : undefined
