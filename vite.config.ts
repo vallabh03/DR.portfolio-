@@ -2,13 +2,12 @@ import { defineConfig, loadEnv, type Connect, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createLimiter, handleConsultation, type Env } from './api/consultation.ts'
-import { handleRetry, handleStatusChange } from './api/_lib/staff.ts'
 import { memoryDb } from './api/_lib/db.ts'
 import seoPages from './scripts/seo-pages.ts'
 
 /**
  * Serves the api/ functions during `npm run dev` and `npm run preview`, so the
- * booking form and staff dashboard work locally as they do on Vercel. Server
+ * booking form works locally as it does on Vercel. Server
  * variables come from .env.local (never exposed to the browser: only VITE_
  * variables are).
  *
@@ -28,9 +27,6 @@ function bookingApi(mode: string): Plugin {
     WHATSAPP_PHONE_NUMBER_ID: '0',
     WHATSAPP_RECIPIENT_NUMBER: '0',
     WHATSAPP_TEMPLATE_NAME: 'dev_mock',
-    WHATSAPP_TEMPLATE_CONFIRMED: 'dev_mock',
-    WHATSAPP_TEMPLATE_RESCHEDULED: 'dev_mock',
-    WHATSAPP_TEMPLATE_REJECTED: 'dev_mock',
   }
   let mockMessages = 0
   const mockFetch: typeof fetch = async () =>
@@ -41,10 +37,6 @@ function bookingApi(mode: string): Plugin {
   const routes: Record<string, (request: Request, ip?: string) => Promise<Response>> = {
     '/api/consultation': (request, ip) =>
       handleConsultation(request, { env: mock ? { ...env, ...mockEnv } : env, db, fetch: mock ? mockFetch : undefined, limiter, clientIp: ip }),
-    '/api/appointments/status': (request, ip) =>
-      handleStatusChange(request, { env: mock ? { ...env, ...mockEnv } : env, db, fetch: mock ? mockFetch : undefined, clientIp: ip }),
-    '/api/notifications/retry': (request, ip) =>
-      handleRetry(request, { env: mock ? { ...env, ...mockEnv } : env, db, fetch: mock ? mockFetch : undefined, clientIp: ip }),
   }
 
   const middleware: Connect.NextHandleFunction = async (req, res, next) => {
@@ -80,7 +72,6 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (/[\/]node_modules[\/](motion|framer-motion|motion-dom|motion-utils)[\/]/.test(id)) return 'motion'
-            if (id.includes('@supabase')) return 'supabase'
             if (id.includes('react')) return 'react'
           }
         },

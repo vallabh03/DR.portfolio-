@@ -1,6 +1,6 @@
 # WhatsApp (Meta Cloud API) setup
 
-The booking system (database, staff dashboard, notifications) is described in
+The booking system (database and notifications) is described in
 [BOOKINGS.md](BOOKINGS.md). This page covers the Meta side: creating the app,
 the sending number and the access token. The browser never talks to Meta and
 never sees a credential.
@@ -15,10 +15,10 @@ never sees a credential.
    This creates a WhatsApp Business Account (WABA) and a free test sending number.
 4. **Recipient number for testing.** In WhatsApp > API Setup, add the practice's
    WhatsApp number as a test recipient and confirm the code sent to it.
-5. **Message templates.** Create the four templates listed in
-   [BOOKINGS.md](BOOKINGS.md#2-meta-whatsapp-cloud-api) (one for the doctor's
-   new-booking message, three for patients). Utility templates are required
-   because the recipients have not written to the business number first.
+5. **Message template.** Create the doctor's new-booking template listed in
+   [BOOKINGS.md](BOOKINGS.md#2-meta-whatsapp-cloud-api). A Utility template is
+   required because the doctor's number has not written to the business number
+   first.
 6. **Permanent access token.** The token on the API Setup page expires quickly.
    In Business settings > Users > System users, create a system user, give it
    access to the app and the WhatsApp account, and generate a token with

@@ -1,4 +1,4 @@
-import type { Appointment, BookingInput, Notification, NotificationKind, NotificationStatus, Slot, Status } from './booking.ts'
+import type { Appointment, BookingInput, Notification, NotificationKind, NotificationStatus } from './booking.ts'
 
 /**
  * The storage the server functions need, as one small interface with two
@@ -10,13 +10,11 @@ import type { Appointment, BookingInput, Notification, NotificationKind, Notific
  *   locally without a database (BOOKING_DEV_MOCK).
  *
  * The rules that must be atomic (one booking per request, claiming a
- * notification before sending it, versioned status changes) live in SQL
- * functions in the real database, and are mirrored exactly in memoryDb.
+ * notification before sending it) live in SQL functions in the real database,
+ * and are mirrored exactly in memoryDb.
  */
 
 export type CreateResult = { result: 'created' | 'existing'; appointment: Appointment } | { result: 'conflict' } | { result: 'limited' }
-export type StatusResult = { result: 'updated' | 'repeat' | 'stale'; appointment: Appointment } | { result: 'not_found' }
-export type StaffMember = { userId: string; name: string; role: string }
 export type FinishUpdate = { status: Extract<NotificationStatus, 'sent' | 'failed' | 'skipped'>; messageId?: string; error?: string }
 
 export interface BookingDb {
@@ -28,9 +26,8 @@ export interface BookingDb {
   finishNotification(id: string, update: FinishUpdate): Promise<void>
   getNotification(id: string): Promise<Notification | null>
   getAppointment(id: string): Promise<Appointment | null>
-  setStatus(id: string, expectedVersion: number, actionId: string, status: Exclude<Status, 'pending'>, date: string | null, slot: Slot | null, staffId: string): Promise<StatusResult>
-  /** The staff member a Supabase access token belongs to, or null. */
-  staffForToken(token: string): Promise<StaffMember | null>
+  /** Notifications still to be delivered (waiting or failed), created since `since`, with fewer than `maxAttempts` attempts. */
+  listRetryable(maxAttempts: number, since: string, limit: number): Promise<Notification[]>
   /** Delivery receipts from Meta's webhook. */
   recordDelivery(messageId: string, status: string, error?: string): Promise<void>
 }
@@ -107,26 +104,10 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
     getNotification: (id) => one<Notification>(`/rest/v1/notifications?id=${eq(id)}&select=*`),
     getAppointment: (id) => one<Appointment>(`/rest/v1/appointments?id=${eq(id)}&select=*`),
 
-    setStatus: (id, expectedVersion, actionId, status, date, slot, staffId) =>
-      rpc<StatusResult>('set_appointment_status', {
-        p_id: id,
-        p_expected_version: expectedVersion,
-        p_action_id: actionId,
-        p_status: status,
-        p_date: date,
-        p_slot: slot,
-        p_staff: staffId,
-      }),
-
-    async staffForToken(token) {
-      const res = await fetchImpl(`${base}/auth/v1/user`, { headers: { apikey: serviceKey, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) })
-      if (res.status === 401 || res.status === 403) return null
-      if (!res.ok) throw new DbError(res.status)
-      const user = (await res.json().catch(() => null)) as { id?: unknown } | null
-      if (typeof user?.id !== 'string') return null
-      const staff = await one<{ user_id: string; name: string; role: string }>(`/rest/v1/staff?user_id=${eq(user.id)}&select=user_id,name,role`)
-      return staff ? { userId: staff.user_id, name: staff.name, role: staff.role } : null
-    },
+    listRetryable: async (maxAttempts, since, limit) =>
+      (await call<Notification[]>(
+        `/rest/v1/notifications?status=in.(pending,failed)&attempts=lt.${maxAttempts}&created_at=gte.${encodeURIComponent(since)}&order=created_at.asc&limit=${limit}&select=*`,
+      )) ?? [],
 
     async recordDelivery(messageId, status, error) {
       await call(`/rest/v1/notifications?meta_message_id=${eq(messageId)}`, {
@@ -140,17 +121,16 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
 
 /* ── In memory (tests and local trial) ───────────────────────────────────── */
 
+type MemoryNotification = Notification & { updatedAt: number; createdAt: number }
+
 export type MemoryDb = BookingDb & {
   appointments: Map<string, Appointment>
-  notifications: Map<string, Notification & { updatedAt: number }>
-  /** Access token -> staff member. */
-  staff: Map<string, StaffMember>
+  notifications: Map<string, MemoryNotification>
 }
 
 export function memoryDb(now: () => number = Date.now): MemoryDb {
   const appointments = new Map<string, Appointment & { createdAt: number }>()
-  const notifications = new Map<string, Notification & { updatedAt: number }>()
-  const staff = new Map<string, StaffMember>()
+  const notifications = new Map<string, MemoryNotification>()
   let counter = 0
   const id = () => `00000000-0000-4000-8000-${String(++counter).padStart(12, '0')}`
   const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -164,7 +144,6 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
   return {
     appointments,
     notifications,
-    staff,
 
     async createBooking(requestId, fingerprint, i, max) {
       const all = [...appointments.values()]
@@ -204,18 +183,19 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
     async ensureNotification(appointmentId, kind, key) {
       const found = [...notifications.values()].find((n) => n.idempotency_key === key)
       if (found) return copy(found)
-      const n = {
+      const n: MemoryNotification = {
         id: id(),
         appointment_id: appointmentId,
         kind,
         idempotency_key: key,
-        status: 'pending' as const,
+        status: 'pending',
         attempts: 0,
         last_error: null,
         meta_message_id: null,
         delivery_status: null,
         sent_at: null,
         updatedAt: now(),
+        createdAt: now(),
       }
       notifications.set(n.id, n)
       return copy(n)
@@ -244,25 +224,11 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
     getNotification: async (nid) => (notifications.has(nid) ? copy(notifications.get(nid)!) : null),
     getAppointment: async (aid) => (appointments.has(aid) ? copy(appointments.get(aid)!) : null),
 
-    async setStatus(aid, expectedVersion, actionId, status, date, slot, staffId) {
-      const a = appointments.get(aid)
-      if (!a) return { result: 'not_found' }
-      if (a.status_version === expectedVersion) {
-        Object.assign(a, {
-          status,
-          scheduled_date: status === 'rejected' ? null : date,
-          scheduled_slot: status === 'rejected' ? null : slot,
-          status_version: a.status_version + 1,
-          last_action_id: actionId,
-          status_changed_by: staffId,
-        })
-        return { result: 'updated', appointment: copy(a) }
-      }
-      if (a.last_action_id === actionId && a.status_version === expectedVersion + 1) return { result: 'repeat', appointment: copy(a) }
-      return { result: 'stale', appointment: copy(a) }
-    },
-
-    staffForToken: async (token) => staff.get(token) ?? null,
+    listRetryable: async (maxAttempts, since, limit) =>
+      [...notifications.values()]
+        .filter((n) => (n.status === 'pending' || n.status === 'failed') && n.attempts < maxAttempts && n.createdAt >= Date.parse(since))
+        .slice(0, limit)
+        .map(copy),
 
     async recordDelivery(messageId, status, error) {
       for (const n of notifications.values()) if (n.meta_message_id === messageId) Object.assign(n, { delivery_status: status, delivery_error: error ?? null })

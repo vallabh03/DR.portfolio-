@@ -9,69 +9,59 @@ How a booking flows:
    Supabase as **Pending**, with a booking reference such as `AT-7K3F9Q`.
    The patient sees that reference straight away.
 3. Only after the booking is saved, the function sends the doctor a WhatsApp
-   message (Meta WhatsApp Cloud API, approved template). If WhatsApp fails, the
-   booking is kept and the message is marked **failed** so it can be retried.
-4. Staff sign in at `/staff`, see the bookings, and **Confirm**, **Reschedule**
-   or **Reject** each one. Each change sends the patient a WhatsApp message.
-5. Every message is recorded (sent / failed, attempts, error code, and, with the
-   optional webhook, delivered / read).
+   message (Meta WhatsApp Cloud API, approved template) with the booking
+   reference, patient name, mobile number, preferred date and time, and
+   consultation type.
+4. If WhatsApp fails, the booking is kept, and the failure is recorded in the
+   `notifications` table. A daily job (`/api/cron/retry-notifications`) tries
+   again, up to five attempts in total. A patient re-sending the same form also
+   retries it. Neither ever creates a second booking or sends the message twice.
 
-The browser never talks to Meta, never sees a Meta token, and never sees the
-Supabase service-role key. Patients cannot see any booking, including their own.
+No staff login is needed. The practice sees every booking in Supabase
+(Table Editor > `appointments`), including the patient's optional message,
+which is deliberately left out of the WhatsApp notification because it can
+contain medical details.
+
+The browser never talks to Meta or Supabase and never sees a key or token.
+Patients cannot see any booking, including their own.
 
 ---
 
 ## 1. Supabase
 
-1. Create a project at supabase.com (choose a region near India, e.g. Mumbai).
+1. Create a project at supabase.com (a region near India, e.g. Mumbai).
 2. **Create the tables:** Dashboard > SQL Editor > New query. Paste the whole of
    `supabase/migrations/20261015120000_appointments.sql` and click **Run**.
+   If you have already run it, there is nothing more to do: the tables
+   (`appointments`, `notifications`, `staff`) stay as they are. The `staff`
+   table is no longer used by the website and can be left empty.
+
    If an earlier version of the appointments table was already created (from the
    removed `20261014_create_appointments.sql`), the script stops with a message;
    if that table holds only test data, run `drop table public.appointments cascade;`
    first and then run the script again.
-   It creates:
-   - `appointments`: booking reference, patient details, requested date/slot,
-     consultation type, consent, status, scheduled date/slot, timestamps.
-   - `notifications`: one row per WhatsApp message, with status, attempts,
-     error code and delivery status.
-   - `staff`: who may use the dashboard.
-   - Row Level Security on all three, plus the server-only functions
-     `create_booking`, `claim_notification` and `set_appointment_status`.
-3. **Staff accounts:** Authentication > Users > Add user > Create new user (email
-   and a strong password; tick "Auto confirm user"). Then add each account to
-   the staff list in the SQL Editor:
-
-   ```sql
-   insert into public.staff (user_id, name, role)
-   select id, 'Reception', 'receptionist' from auth.users where email = 'reception@example.com';
-   ```
-
-   Use `'doctor'` as the role for the doctor. Removing a row removes access.
-   Turn off public sign-ups: Authentication > Sign In / Providers > Email >
-   disable "Allow new users to sign up". Staff accounts are only created by you.
-4. **Keys:** Project Settings > API (or "API Keys"):
-   - Project URL → `SUPABASE_URL` and `VITE_SUPABASE_URL`
-   - `anon` / publishable key → `VITE_SUPABASE_ANON_KEY` (safe in the browser:
-     Row Level Security lets it read bookings only for staff, and never write)
+3. **Key:** Project Settings > API (or "API Keys"):
+   - Project URL → `SUPABASE_URL`
    - `service_role` / secret key → `SUPABASE_SERVICE_ROLE_KEY` (**server only;
-     never with a `VITE_` prefix, never in source code**)
+     never with a `VITE_` prefix, never in source code**). `SUPABASE_SECRET_KEY`
+     is accepted as another name for the same key.
+
+   The public `anon` key is not needed.
 
 ### Who can see what (Row Level Security)
 
-| | Patients / public (anon key) | Signed-in staff | Server functions (service role) |
-|---|---|---|---|
-| Read bookings | No | Yes | Yes |
-| Create bookings | No (only via `/api/consultation`) | No | Yes, after validation |
-| Change status | No | Only via `/api/appointments/status` | Yes, after checking the staff sign-in |
-| Read notifications | No | Yes | Yes |
+Row Level Security is on for all three tables, and no policy allows the public
+(`anon`) key to read or write anything. Only the server functions, using the
+service-role key, can create bookings and update notification records, and
+they do so through the database functions in the migration
+(`create_booking`, `claim_notification`), which only the service role may call.
 
 ## 2. Meta WhatsApp Cloud API
 
 Follow steps 1–4 and 6–7 of the Meta section in [SETUP.md](SETUP.md) (Meta app,
 WhatsApp Business Account, test or live sending number, permanent system-user
-token). Then create these **four templates** in WhatsApp Manager > Message
-templates: category **Utility**, language **English** (`en`, must match
+token). Then create **one template** in WhatsApp Manager > Message templates:
+category **Utility**, language **English** (`en`, must match
 `WHATSAPP_TEMPLATE_LANGUAGE`), parameter type **Named**.
 
 **Doctor: new booking** (`WHATSAPP_TEMPLATE_NAME`, suggested name `new_booking_request`)
@@ -85,38 +75,16 @@ Requested: {{requested}}
 Type: {{type}}
 Status: {{status}}
 
-Please review it in the staff dashboard.
+Please contact the patient to confirm a time.
 ```
 
-Example values: `AT-7K3F9Q`, `Test Patient`, `+919876543210`,
-`20 October 2026, Morning`, `In-person`, `Pending`.
+Example values for Meta's review: `AT-7K3F9Q`, `Test Patient`,
+`+919876543210`, `20 October 2026, Morning`, `In-person`, `Pending`.
 
-**Patient: confirmed** (`WHATSAPP_TEMPLATE_CONFIRMED`, e.g. `appointment_confirmed`)
-
-```
-Hello {{name}}, your consultation with Dr. Abhinav Thaduri is confirmed for {{date_time}}. Booking reference: {{booking_id}}.
-```
-
-**Patient: rescheduled** (`WHATSAPP_TEMPLATE_RESCHEDULED`, e.g. `appointment_rescheduled`)
-
-```
-Hello {{name}}, your consultation request {{booking_id}} with Dr. Abhinav Thaduri has been rescheduled to {{date_time}}. Please contact the practice if this time does not suit you.
-```
-
-**Patient: declined** (`WHATSAPP_TEMPLATE_REJECTED`, e.g. `appointment_declined`)
-
-```
-Hello {{name}}, we are unable to offer an appointment for your request {{booking_id}} at this time. Please contact the practice to arrange another time.
-```
-
-`{{date_time}}` is filled like `22 October 2026, Afternoon`. The doctor and
-practice should approve the wording before submitting the templates; Meta's
-review can take up to 24 hours.
-
-Patient messages go to the mobile number the patient entered (they consent to
-WhatsApp contact on the form). With Meta's **test** number, every recipient
-must first be added as a test recipient, so patient messages only reach real
-patients once a live sending number is set up.
+A template is required because the doctor's number receives these messages
+without having written to the business number first. Review can take up to
+24 hours. With Meta's **test** sending number, the doctor's number must first be
+added as a test recipient (WhatsApp > API Setup).
 
 ### Optional: delivery receipts (webhook)
 
@@ -127,31 +95,35 @@ In the Meta app > WhatsApp > Configuration > Webhook:
 - App secret (App settings > Basic) → `WHATSAPP_APP_SECRET`. Every webhook call
   is checked against it; unsigned calls are refused.
 
-The dashboard then shows "Sent (delivered)" / "(read)" / "(failed)".
+The `notifications` table then shows `delivered`, `read` or `failed` in
+`delivery_status`.
 
-## 3. Environment variables
+## 3. Vercel
 
-Vercel > Project > Settings > Environment Variables (Production, and Preview if
-previews should use them), then redeploy. Locally: `.env.local`.
+**Environment variables:** Project > Settings > Environment Variables, for
+Production (and Preview if previews should save real bookings), then redeploy.
 
-| Variable | Where it is used | Secret? |
+| Variable | Purpose | Secret? |
 |---|---|---|
-| `SUPABASE_URL` | Server functions | No |
-| `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | Server functions | **Yes** |
-| `VITE_SUPABASE_URL` | Staff dashboard (browser) | No |
-| `VITE_SUPABASE_ANON_KEY` | Staff dashboard (browser) | No (public by design) |
-| `WHATSAPP_ACCESS_TOKEN` | Server functions | **Yes** |
-| `WHATSAPP_PHONE_NUMBER_ID` | Server functions | No |
+| `SUPABASE_URL` | Supabase project URL | No |
+| `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | Saving bookings | **Yes** |
+| `WHATSAPP_ACCESS_TOKEN` | Sending the notification | **Yes** |
+| `WHATSAPP_PHONE_NUMBER_ID` | The sending number | No |
 | `WHATSAPP_RECIPIENT_NUMBER` | Doctor's WhatsApp number, country code first | No |
-| `WHATSAPP_TEMPLATE_NAME` | Doctor's new-booking template | No |
-| `WHATSAPP_TEMPLATE_CONFIRMED` | Patient confirmation template | No |
-| `WHATSAPP_TEMPLATE_RESCHEDULED` | Patient reschedule template | No |
-| `WHATSAPP_TEMPLATE_REJECTED` | Patient declined template | No |
+| `WHATSAPP_TEMPLATE_NAME` | The approved template, e.g. `new_booking_request` | No |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Template language code, e.g. `en` | No |
+| `CRON_SECRET` | Lets only Vercel's scheduler run the daily retry (any long random text) | **Yes** |
 | `WHATSAPP_API_VERSION` | Optional, defaults to `v23.0` | No |
-| `WHATSAPP_APP_SECRET` | Webhook signature check (optional webhook) | **Yes** |
-| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Webhook subscription check (optional webhook) | **Yes** |
-| `ALLOWED_ORIGINS` | Optional; e.g. `https://www.drabhinavthaduri.in` | No |
+| `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Optional webhook | **Yes** |
+| `ALLOWED_ORIGINS` | Optional, e.g. `https://www.drabhinavthaduri.in` | No |
+
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are no longer used and can be
+removed from Vercel.
+
+**Daily retry:** `vercel.json` schedules `/api/cron/retry-notifications` every
+day at 03:00 UTC (08:30 IST). Vercel sends `CRON_SECRET` with each call; without
+it the job refuses to run. It appears under Project > Settings > Cron Jobs after
+deploying.
 
 ## 4. Reliability and protection
 
@@ -161,47 +133,38 @@ previews should use them), then redeploy. Locally: `.env.local`.
   reuses it on retries. The database returns the same booking for a repeated id,
   and for the same details sent again within a day. A reused id with different
   details is refused.
-- **No duplicate messages:** each message has its own row with a unique key
-  (booking + event). Before sending, the row is claimed in the database, so a
-  retried request, a double click or two servers can never send it twice. A
-  claim left by a crashed attempt expires after two minutes.
-- **Retries:** failed messages show a **Retry** button in the dashboard. A
-  patient retrying the same submission also retries the doctor's message if it
-  had failed.
-- **Two staff at once:** each status change names the version the staff member
-  saw; if someone else changed it first, the change is refused and the list
-  reloads.
+- **No duplicate messages:** each message has one row with a unique key. Before
+  sending, the row is claimed in the database, so a retried request, the daily
+  job and a second server can never send it twice. A claim left by a crashed
+  attempt expires after two minutes.
 - **Limits:** 5 booking requests per connection per 10 minutes (per server
   instance), and 3 bookings per mobile number per day (in the database).
   Same-site requests only, JSON only, 8 KB maximum, hidden spam field and a
   minimum fill time.
-- **Logs** contain outcomes and error codes only: never names, numbers,
-  messages, tokens or Meta's error text.
+- **Responses** to the browser contain only `ok`, the booking reference and an
+  error code. **Logs** contain outcomes and error codes only: never names,
+  numbers, messages, tokens or Meta's error text.
 
 ## 5. Trying it locally without Supabase or Meta
 
 Set `BOOKING_DEV_MOCK=sent` (or `failed`) in `.env.local` and run `npm run dev`.
 Bookings are kept in memory and WhatsApp is replaced by a stand-in that succeeds
-(or fails). This only affects `npm run dev` / `npm run preview`. The staff
-dashboard needs a real Supabase project.
+(or fails). This only affects `npm run dev` / `npm run preview`.
 
-## 6. Tests
+## 6. Tests and the real end-to-end check
 
 `npm test` covers validation, saving before notifying, duplicate and retry
-handling, concurrent requests, failure recovery, staff sign-in checks, status
-changes, the webhook signature and the exact requests sent to Supabase and Meta.
-They use stand-ins for Supabase and Meta, so they do **not** prove that real
-delivery works: that needs the setup above and a test booking on the deployed
-site.
+handling, concurrent requests, failure recovery, the retry job, the webhook
+signature and the exact requests sent to Supabase and Meta. They use stand-ins
+for Supabase and Meta, so they do **not** prove that real delivery works.
 
-### Checklist after deploying
+After deploying, check it for real:
 
 1. Make a test booking on the live site; note the reference.
-2. In Supabase > Table Editor > `appointments`, the booking is there as `pending`.
-3. The doctor's WhatsApp receives the new-booking message; in `notifications`
-   the row is `sent` with a `meta_message_id`.
-4. Sign in at `/staff`, confirm the test booking; the test patient number
-   receives the confirmation.
-5. Temporarily set a wrong `WHATSAPP_ACCESS_TOKEN`, make another booking: the
-   booking still succeeds and the notification shows `failed`. Restore the
-   token, redeploy, press **Retry**: it is sent once.
+2. Supabase > Table Editor > `appointments`: the booking is there as `pending`.
+3. The doctor's WhatsApp receives the message; in `notifications` the row is
+   `sent` with a `meta_message_id`.
+4. To test recovery: temporarily set a wrong `WHATSAPP_ACCESS_TOKEN`, redeploy,
+   make another booking. The booking succeeds and its notification shows
+   `failed` with an error code. Restore the token and redeploy; the next daily
+   run (or Vercel > Cron Jobs > Run) sends it once.

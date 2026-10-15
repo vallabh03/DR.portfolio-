@@ -8,9 +8,6 @@ export const ENV: Env = {
   WHATSAPP_PHONE_NUMBER_ID: '1234567890',
   WHATSAPP_RECIPIENT_NUMBER: '+91 90000 00000',
   WHATSAPP_TEMPLATE_NAME: 'new_booking_request',
-  WHATSAPP_TEMPLATE_CONFIRMED: 'appointment_confirmed',
-  WHATSAPP_TEMPLATE_RESCHEDULED: 'appointment_rescheduled',
-  WHATSAPP_TEMPLATE_REJECTED: 'appointment_declined',
   WHATSAPP_TEMPLATE_LANGUAGE: 'en',
 }
 
