@@ -1,5 +1,5 @@
 import { doctor, hasValue, QUALIFICATIONS } from './doctor.ts'
-import { BOOK_PATH, documentTitle } from './navigation.ts'
+import { BOOK_PATH, documentTitle, STAFF_PATH } from './navigation.ts'
 import { visibleSections } from './gallery.ts'
 import { postPath, publishedPosts } from './blog.ts'
 
@@ -93,6 +93,12 @@ export const pages: PageMeta[] = [
     title: documentTitle(BOOK_PATH),
     description: `Request a consultation with ${doctor.name}, ${role} at ${practice}.`,
   },
+  {
+    path: STAFF_PATH,
+    title: `Staff · ${doctor.name}`,
+    description: `Staff sign-in for consultation bookings at the practice of ${doctor.name}. Not for patients or visitors.`,
+    noindex: true,
+  },
   // One page per gallery section that is switched on. Surgical images stay out of search results.
   ...visibleSections.map(
     (s): PageMeta => ({
@@ -133,6 +139,7 @@ export const robotsTxt = () =>
     'User-agent: *',
     'Allow: /',
     'Disallow: /api/',
+    `Disallow: ${STAFF_PATH}`,
     'Disallow: /images/surgery-',
     'Disallow: /images/optimized/surgery-',
     '',

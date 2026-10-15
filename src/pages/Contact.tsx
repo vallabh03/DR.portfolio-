@@ -2,6 +2,7 @@ import { doctor, hasValue } from '../data/doctor'
 import RevealText from '../components/RevealText'
 import DrawLine from '../components/DrawLine'
 import { ArrowRight } from '../components/Button'
+import { WhatsAppChatLink } from '../components/WhatsAppButton'
 
 /**
  * Contact: the doctor's name, telephone and email as ruled rows, nothing else.
@@ -29,6 +30,7 @@ export default function Contact() {
           <DirectoryRow key={r.label} row={r} first={i === 0} />
         ))}
       </ul>
+      <WhatsAppChatLink className="mt-8 w-full sm:w-auto" />
     </section>
   )
 }

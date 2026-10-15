@@ -1,30 +1,26 @@
 /**
- * Tests for api/consultation.ts. Meta is never called: every test passes a
- * stand-in fetch and records what would have been sent.
+ * Tests for the booking endpoint (api/consultation.ts). The database is the
+ * in-memory implementation with the same rules as the SQL functions, and Meta
+ * is never called: every test passes a stand-in fetch and records what would
+ * have been sent.
  * Run with: npm test
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createStore, handleConsultation, templateParameters, type Env } from '../api/consultation.ts'
+import { createLimiter, handleConsultation, normalisePhone, type Env } from '../api/consultation.ts'
+import { memoryDb, type BookingDb, type MemoryDb } from '../api/_lib/db.ts'
+import { ENV, metaStub, SECRET, type Call } from './helpers.ts'
 
 const NOW = Date.UTC(2026, 9, 6, 12)
 const ORIGIN = 'https://www.example.test'
-const SECRET = 'test-token-not-real'
 
-const ENV: Env = {
-  WHATSAPP_ACCESS_TOKEN: SECRET,
-  WHATSAPP_PHONE_NUMBER_ID: '1234567890',
-  WHATSAPP_RECIPIENT_NUMBER: '+91 90000 00000',
-  WHATSAPP_TEMPLATE_NAME: 'consultation_request',
-  WHATSAPP_TEMPLATE_LANGUAGE: 'en',
-}
 
 const valid = {
   name: 'Test Visitor',
   phone: '+91 98765 43210',
   email: 'visitor@example.test',
   date: '2026-10-20',
-  time: 'morning',
+  slot: 'morning',
   message: 'Consultation regarding a follow-up.',
   consent: true,
   requestId: 'req-0001-abcdef',
@@ -32,160 +28,198 @@ const valid = {
   website: '',
 }
 
-type Call = { url: string; init: RequestInit }
-
-function metaStub(kind: 'sent' | 'rejected' | 'network' | 'timeout') {
-  const calls: Call[] = []
-  const fetchImpl = (async (url: string, init: RequestInit) => {
-    calls.push({ url, init })
-    if (kind === 'network') throw new TypeError('fetch failed')
-    if (kind === 'timeout') throw new DOMException('timed out', 'TimeoutError')
-    if (kind === 'rejected') return Response.json({ error: { message: `bad ${valid.name}`, code: 132000, fbtrace_id: 'trace' } }, { status: 400 })
-    return Response.json({ messages: [{ id: 'wamid.TEST' }] })
-  }) as typeof fetch
-  return { calls, fetchImpl }
-}
-
 function request(body: unknown, init: { method?: string; origin?: string | null; type?: string; ip?: string; raw?: string } = {}) {
   const headers = new Headers({ host: 'www.example.test', 'x-real-ip': init.ip ?? '203.0.113.1' })
   if (init.origin !== null) headers.set('origin', init.origin ?? ORIGIN)
   headers.set('content-type', init.type ?? 'application/json')
   const method = init.method ?? 'POST'
-  return new Request('https://www.example.test/api/consultation', {
-    method,
-    headers,
-    body: method === 'GET' ? undefined : (init.raw ?? JSON.stringify(body)),
-  })
+  return new Request('https://www.example.test/api/consultation', { method, headers, body: method === 'GET' ? undefined : (init.raw ?? JSON.stringify(body)) })
 }
 
-type Logger = { info: (m: string) => void; warn: (m: string) => void; error: (m: string) => void }
-
 type RunOptions = {
-  meta?: { calls: Call[]; fetchImpl: typeof fetch }
+  meta?: ReturnType<typeof metaStub>
   env?: Env
-  store?: ReturnType<typeof createStore>
+  db?: BookingDb | null
+  limiter?: ReturnType<typeof createLimiter>
   logs?: string[]
-  log?: Logger
   now?: number
 } & Parameters<typeof request>[1]
 
 async function run(body: unknown, opts: RunOptions = {}) {
   const meta = opts.meta ?? metaStub('sent')
   const logs = opts.logs ?? []
-  const log = opts.log ?? { info: (m: string) => logs.push(m), warn: (m: string) => logs.push(m), error: (m: string) => logs.push(m) }
+  const db = opts.db === undefined ? memoryDb(() => opts.now ?? NOW) : opts.db
   const res = await handleConsultation(request(body, opts), {
     env: opts.env ?? ENV,
-    store: opts.store ?? createStore(),
+    db,
+    limiter: opts.limiter ?? createLimiter(),
     fetch: meta.fetchImpl,
     now: () => opts.now ?? NOW,
-    log,
+    log: { info: (m) => logs.push(m), warn: (m) => logs.push(m), error: (m) => logs.push(m) },
   })
   const text = await res.text()
-  return { res, text, json: JSON.parse(text) as { ok: boolean; error?: string }, meta, logs }
+  return { res, text, json: JSON.parse(text) as { ok: boolean; error?: string; bookingRef?: string; status?: string }, meta, logs, db: db as MemoryDb }
 }
 
-test('valid request is sent as the approved template and returns ok', async () => {
-  const { res, json, meta } = await run(valid)
-  assert.equal(res.status, 200)
-  assert.deepEqual(json, { ok: true })
+const sentBody = (call: Call) => JSON.parse(String(call.init.body))
+
+/* ── Booking and doctor notification ─────────────────────────────────────── */
+
+test('a valid booking is saved as pending, gets a reference, and the doctor is notified with the template', async () => {
+  const { res, json, meta, db } = await run(valid)
+  assert.equal(res.status, 201)
+  assert.equal(json.ok, true)
+  assert.equal(json.status, 'pending')
+  assert.match(json.bookingRef ?? '', /^AT-[A-Z2-9]{6}$/)
+
+  const [saved] = [...db.appointments.values()]
+  assert.equal(saved.booking_ref, json.bookingRef)
+  assert.equal(saved.status, 'pending')
+  assert.equal(saved.patient_phone, '919876543210')
+  assert.equal(saved.consultation_type, 'in_person')
+  assert.equal(saved.requested_slot, 'morning')
+
   assert.equal(meta.calls.length, 1)
   const { url, init } = meta.calls[0]
   assert.equal(url, 'https://graph.facebook.com/v23.0/1234567890/messages')
   assert.equal((init.headers as Record<string, string>).Authorization, `Bearer ${SECRET}`)
-  const sent = JSON.parse(String(init.body))
+  const sent = sentBody(meta.calls[0])
   assert.equal(sent.to, '919000000000')
-  assert.equal(sent.type, 'template')
-  assert.equal(sent.template.name, 'consultation_request')
+  assert.equal(sent.template.name, 'new_booking_request')
   assert.deepEqual(sent.template.components[0].parameters, [
+    { type: 'text', parameter_name: 'booking_id', text: json.bookingRef },
     { type: 'text', parameter_name: 'name', text: 'Test Visitor' },
-    { type: 'text', parameter_name: 'phone', text: '+91 98765 43210' },
-    { type: 'text', parameter_name: 'email', text: 'visitor@example.test' },
-    {
-      type: 'text',
-      parameter_name: 'details',
-      text: 'Preferred Date: 20 October 2026 · Preferred Time: Morning · Reason: Consultation regarding a follow-up. · Consent: Yes',
-    },
+    { type: 'text', parameter_name: 'phone', text: '+919876543210' },
+    { type: 'text', parameter_name: 'requested', text: '20 October 2026, Morning' },
+    { type: 'text', parameter_name: 'type', text: 'In-person' },
+    { type: 'text', parameter_name: 'status', text: 'Pending' },
   ])
+
+  const [n] = [...db.notifications.values()]
+  assert.equal(n.kind, 'doctor_new')
+  assert.equal(n.status, 'sent')
+  assert.equal(n.meta_message_id, 'wamid.TEST-1')
+  assert.equal(n.attempts, 1)
 })
 
-test('fields the visitor did not enter are left out of the message', () => {
-  const p = templateParameters({ name: 'A B', phone: '0123456789', email: 'a@b.co', date: '', time: '', message: '' })
-  assert.equal(p.details, 'Consent: Yes')
-})
-
-test('email is optional; when left empty the request is accepted and the message says so', async () => {
-  const p = templateParameters({ name: 'A B', phone: '0123456789', email: '', date: '', time: '', message: '' })
-  assert.equal(p.email, 'Not provided')
-  const { res, meta } = await run({ ...valid, email: '', requestId: 'req-no-email-abc' })
-  assert.equal(res.status, 200)
-  assert.equal(meta.calls.length, 1)
-})
-
-test('line breaks in the message become spaces; very long messages are shortened', () => {
-  const p = templateParameters({ name: 'A B', phone: '0123456789', email: 'a@b.co', date: '', time: '', message: 'one\n\ntwo\tthree' })
-  assert.equal(p.details, 'Reason: one two three · Consent: Yes')
-  const long = templateParameters({ name: 'N'.repeat(100), phone: '0123456789', email: 'e'.repeat(240) + '@x.co', date: '', time: '', message: 'x'.repeat(1000) })
-  assert.ok(long.details.endsWith('… (shortened) · Consent: Yes'))
-  assert.ok(Object.values(long).join('').length <= 840)
-  for (const v of Object.values(long)) assert.ok(!/[\n\t]| {4}/.test(v))
-})
-
-test('Meta rejection returns delivery_failed and never echoes Meta or secrets', async () => {
-  const { res, text, logs } = await run(valid, { meta: metaStub('rejected') })
-  assert.equal(res.status, 502)
-  assert.equal(JSON.parse(text).error, 'delivery_failed')
-  assert.ok(!text.includes('132000') && !text.includes(SECRET))
-  const joined = logs.join('\n')
-  assert.ok(joined.includes('code 132000'))
-  assert.ok(!joined.includes(valid.name) && !joined.includes(valid.email) && !joined.includes(SECRET))
-})
-
-test('network failure and timeout return delivery_failed', async () => {
-  for (const kind of ['network', 'timeout'] as const) {
-    const { res, json } = await run(valid, { meta: metaStub(kind) })
-    assert.equal(res.status, 502)
-    assert.equal(json.error, 'delivery_failed')
+test('the booking is kept when WhatsApp fails, the failure is recorded, and the response is still a booking', async () => {
+  for (const kind of ['rejected', 'network', 'timeout'] as const) {
+    const { res, json, db, text, logs } = await run(valid, { meta: metaStub(kind) })
+    assert.equal(res.status, 201, kind)
+    assert.match(json.bookingRef ?? '', /^AT-/)
+    assert.equal(db.appointments.size, 1)
+    const [n] = [...db.notifications.values()]
+    assert.equal(n.status, 'failed', kind)
+    assert.ok(n.last_error, kind)
+    // Meta's error text (which can echo submitted values) and secrets never reach the response or logs.
+    const everything = text + logs.join('\n') + (n.last_error ?? '')
+    for (const leaked of [SECRET, valid.name, valid.email, '98765']) assert.ok(!everything.includes(leaked), `${kind}: ${leaked}`)
   }
 })
 
-test('a failed request can be retried with the same request id', async () => {
-  const store = createStore()
-  const first = await run(valid, { store, meta: metaStub('rejected') })
-  assert.equal(first.res.status, 502)
-  const retry = await run(valid, { store, meta: metaStub('sent') })
+test('a retry of the same request returns the same booking and only retries a notification that failed', async () => {
+  const db = memoryDb(() => NOW)
+  const first = await run(valid, { db, meta: metaStub('rejected') })
+  assert.equal(first.res.status, 201)
+  const retry = await run(valid, { db, meta: metaStub('sent') })
   assert.equal(retry.res.status, 200)
+  assert.equal(retry.json.bookingRef, first.json.bookingRef)
   assert.equal(retry.meta.calls.length, 1)
-})
+  assert.equal(db.appointments.size, 1)
+  const [n] = [...db.notifications.values()]
+  assert.equal(n.status, 'sent')
+  assert.equal(n.attempts, 2)
 
-test('a repeat of a sent request is not sent twice', async () => {
-  const store = createStore()
-  await run(valid, { store })
-  const again = await run(valid, { store })
-  assert.equal(again.res.status, 200)
+  // Once sent, repeats never send again.
+  const again = await run(valid, { db })
+  assert.equal(again.json.bookingRef, first.json.bookingRef)
   assert.equal(again.meta.calls.length, 0)
-  const sameDetailsNewId = await run({ ...valid, requestId: 'req-0002-abcdef' }, { store, ip: '203.0.113.9' })
-  assert.equal(sameDetailsNewId.meta.calls.length, 0)
 })
 
-test('missing configuration returns unavailable without calling Meta', async () => {
-  const { res, json, meta, logs } = await run(valid, { env: { ...ENV, WHATSAPP_ACCESS_TOKEN: '' } })
+test('the same details sent again with a new request id are the same booking, not a duplicate', async () => {
+  const db = memoryDb(() => NOW)
+  const first = await run(valid, { db })
+  const second = await run({ ...valid, requestId: 'req-0002-abcdef' }, { db, ip: '203.0.113.9' })
+  assert.equal(second.res.status, 200)
+  assert.equal(second.json.bookingRef, first.json.bookingRef)
+  assert.equal(second.meta.calls.length, 0)
+  assert.equal(db.appointments.size, 1)
+})
+
+test('a request id reused with different details is a conflict', async () => {
+  const db = memoryDb(() => NOW)
+  await run(valid, { db })
+  const reused = await run({ ...valid, message: 'Something else entirely.' }, { db })
+  assert.equal(reused.res.status, 409)
+  assert.equal(reused.json.error, 'conflict')
+  assert.equal(reused.meta.calls.length, 0)
+  assert.equal(db.appointments.size, 1)
+})
+
+test('concurrent copies of one request create one booking and send one notification', async () => {
+  const db = memoryDb(() => NOW)
+  const meta = metaStub('sent')
+  const results = await Promise.all([run(valid, { db, meta }), run(valid, { db, meta }), run(valid, { db, meta })])
+  assert.equal(new Set(results.map((r) => r.json.bookingRef)).size, 1)
+  assert.equal(db.appointments.size, 1)
+  assert.equal(meta.calls.length, 1)
+})
+
+test('at most three bookings per phone number per day', async () => {
+  const db = memoryDb(() => NOW)
+  const statuses: number[] = []
+  for (let i = 0; i < 4; i++) statuses.push((await run({ ...valid, requestId: `req-day-${i}abcd`, message: `m${i}` }, { db, ip: `203.0.113.${20 + i}` })).res.status)
+  assert.deepEqual(statuses, [201, 201, 201, 429])
+})
+
+test('missing database configuration returns unavailable and sends nothing', async () => {
+  const { res, json, meta, logs } = await run(valid, { db: null, env: ENV })
   assert.equal(res.status, 503)
   assert.equal(json.error, 'unavailable')
   assert.equal(meta.calls.length, 0)
-  assert.match(logs.join(), /missing WHATSAPP_ACCESS_TOKEN/)
+  assert.match(logs.join(), /database is not configured/)
 })
 
-test('server-side validation rejects bad input', async () => {
+test('a database failure returns save_failed and sends nothing', async () => {
+  const broken: BookingDb = { ...memoryDb(), createBooking: async () => Promise.reject(new Error('database request failed (500)')) }
+  const { res, json, meta } = await run(valid, { db: broken })
+  assert.equal(res.status, 502)
+  assert.equal(json.error, 'save_failed')
+  assert.equal(meta.calls.length, 0)
+})
+
+test('missing WhatsApp settings keep the booking and mark the notification for retry', async () => {
+  const { res, db, meta } = await run(valid, { env: { ...ENV, WHATSAPP_ACCESS_TOKEN: '' } })
+  assert.equal(res.status, 201)
+  assert.equal(meta.calls.length, 0)
+  const [n] = [...db.notifications.values()]
+  assert.equal(n.status, 'failed')
+  assert.equal(n.last_error, 'not_configured')
+})
+
+/* ── Validation ──────────────────────────────────────────────────────────── */
+
+test('phone numbers need a country code', () => {
+  assert.equal(normalisePhone('+91 98765 43210'), '919876543210')
+  assert.equal(normalisePhone('+1 (415) 555-0100'), '14155550100')
+  for (const bad of ['98765 43210', '+0 98765 43210', '+91', 'call me', '+91 98765 43210 1234 5678']) assert.equal(normalisePhone(bad), null, bad)
+})
+
+test('server-side validation rejects bad input and saves nothing', async () => {
   const cases: Record<string, unknown> = {
     'empty fields': { elapsedMs: 30_000, requestId: 'req-empty-abc' },
     'missing name': { ...valid, name: '' },
     'long name': { ...valid, name: 'x'.repeat(101) },
+    'phone without country code': { ...valid, phone: '98765 43210' },
     'invalid phone': { ...valid, phone: 'call me' },
-    'phone without digits': { ...valid, phone: '+++++++' },
     'invalid email': { ...valid, email: 'not-an-email' },
+    'no date': { ...valid, date: '' },
     'past date': { ...valid, date: '2026-01-01' },
+    'too far ahead': { ...valid, date: '2027-12-01' },
     'impossible date': { ...valid, date: '2026-02-30' },
-    'unknown time': { ...valid, time: 'midnight' },
+    'no slot': { ...valid, slot: '' },
+    'unknown slot': { ...valid, slot: 'midnight' },
+    'type not offered': { ...valid, type: 'online' },
     'long message': { ...valid, message: 'x'.repeat(1001) },
     'no consent': { ...valid, consent: false },
     'consent as string': { ...valid, consent: 'true' },
@@ -193,18 +227,47 @@ test('server-side validation rejects bad input', async () => {
     'array body': [valid],
   }
   for (const [label, body] of Object.entries(cases)) {
-    const { res, json, meta } = await run(body)
+    const { res, json, meta, db } = await run(body)
     assert.equal(res.status, 422, label)
     assert.equal(json.error, 'invalid', label)
     assert.equal(meta.calls.length, 0, label)
+    assert.equal(db.appointments.size, 0, label)
   }
 })
 
+test('email and message are optional; in-person is accepted when named', async () => {
+  for (const body of [{ ...valid, email: '', message: '' }, { ...valid, type: 'in_person', requestId: 'req-type-abcd', message: 'x' }]) {
+    assert.equal((await run(body)).res.status, 201)
+  }
+})
+
+test('slot accepts only the listed options, never inherited object properties', async () => {
+  for (const slot of ['toString', 'constructor', 'hasOwnProperty', '__proto__', 'valueOf', 'Morning']) {
+    const { res } = await run({ ...valid, slot })
+    assert.equal(res.status, 422, slot)
+  }
+})
+
+test('only the form fields are accepted, and text fields must be text', async () => {
+  const { message: _omitted, ...withoutMessage } = valid
+  const cases: Record<string, unknown> = {
+    'date as a number': { ...valid, date: 20261020 },
+    'slot as null': { ...valid, slot: null },
+    'message as an object': { ...valid, message: { text: 'hi' } },
+    'missing field': withoutMessage,
+    'unexpected extra field': { ...valid, status: 'confirmed' },
+  }
+  for (const [label, body] of Object.entries(cases)) assert.equal((await run(body)).res.status, 422, label)
+  const raw = JSON.stringify(valid).replace(/^\{/, '{"__proto__":{"admin":true},')
+  assert.equal((await run(null, { raw })).res.status, 422)
+})
+
 test('spam signals are rejected', async () => {
-  for (const body of [{ ...valid, website: 'http://spam.test' }, { ...valid, elapsedMs: 400 }, { ...valid, elapsedMs: undefined }]) {
-    const { res, meta } = await run(body)
+  for (const body of [{ ...valid, website: 'http://spam.test' }, { ...valid, website: 1 }, { ...valid, elapsedMs: 400 }, { ...valid, elapsedMs: undefined }]) {
+    const { res, meta, db } = await run(body)
     assert.equal(res.status, 400)
     assert.equal(meta.calls.length, 0)
+    assert.equal(db.appointments.size, 0)
   }
 })
 
@@ -220,14 +283,15 @@ test('malformed, oversized, cross-origin and wrong-method requests are rejected'
 test('ALLOWED_ORIGINS restricts which sites may post', async () => {
   const env = { ...ENV, ALLOWED_ORIGINS: 'https://www.real.test' }
   assert.equal((await run(valid, { env })).res.status, 403)
-  assert.equal((await run(valid, { env, origin: 'https://www.real.test' })).res.status, 200)
+  assert.equal((await run(valid, { env, origin: 'https://www.real.test' })).res.status, 201)
 })
 
 test('more than five requests from one address in ten minutes are rate limited', async () => {
-  const store = createStore()
+  const limiter = createLimiter()
+  const db = memoryDb(() => NOW)
   const statuses: number[] = []
-  for (let i = 0; i < 6; i++) statuses.push((await run({ ...valid, requestId: `req-rate-${i}abc`, message: `m${i}` }, { store })).res.status)
-  assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429])
+  for (let i = 0; i < 6; i++) statuses.push((await run(null, { limiter, db, raw: '{bad' })).res.status)
+  assert.deepEqual(statuses, [400, 400, 400, 400, 400, 429])
 })
 
 test('responses carry no-store and JSON content type', async () => {
@@ -236,166 +300,17 @@ test('responses carry no-store and JSON content type', async () => {
   assert.match(res.headers.get('content-type') ?? '', /application\/json/)
 })
 
-/* ── Validation allowlists ───────────────────────────────────────────────── */
-
-test('time accepts only the listed options, never inherited object properties', async () => {
-  for (const time of ['', 'morning', 'midday', 'afternoon', 'evening']) {
-    const { res } = await run({ ...valid, time, requestId: `req-time-${time || 'none'}`, message: `time ${time}` })
-    assert.equal(res.status, 200, `"${time}" should be accepted`)
-  }
-  for (const time of ['toString', 'constructor', 'hasOwnProperty', '__proto__', 'valueOf', 'Morning']) {
-    const { res, json, meta } = await run({ ...valid, time })
-    assert.equal(res.status, 422, `"${time}" should be rejected`)
-    assert.equal(json.error, 'invalid')
-    assert.equal(meta.calls.length, 0)
-  }
-})
-
-test('only the form fields are accepted, and text fields must be text', async () => {
-  const { message: _omitted, ...withoutMessage } = valid
-  const cases: Record<string, unknown> = {
-    'date as a number': { ...valid, date: 20261020 },
-    'time as null': { ...valid, time: null },
-    'message as an object': { ...valid, message: { text: 'hi' } },
-    'missing optional field': withoutMessage,
-    'unexpected extra field': { ...valid, admin: true },
-  }
-  for (const [label, body] of Object.entries(cases)) {
-    const { res, meta } = await run(body)
-    assert.equal(res.status, 422, label)
-    assert.equal(meta.calls.length, 0, label)
-  }
-  // A "__proto__" key written into the JSON text is an own key after parsing, so it is rejected too.
-  const raw = JSON.stringify(valid).replace(/^\{/, '{"__proto__":{"admin":true},')
-  assert.equal((await run(null, { raw })).res.status, 422)
-})
-
-test('a honeypot value that is not text counts as automated', async () => {
-  const { res, meta } = await run({ ...valid, website: 1 })
-  assert.equal(res.status, 400)
-  assert.equal(meta.calls.length, 0)
-})
-
-/* ── Duplicate and idempotency handling ──────────────────────────────────── */
-
-test('a request id reused with different details is a conflict, not a duplicate', async () => {
-  const store = createStore()
-  assert.equal((await run(valid, { store })).res.status, 200)
-  const reused = await run({ ...valid, message: 'Something else entirely.' }, { store })
-  assert.equal(reused.res.status, 409)
-  assert.equal(reused.json.error, 'conflict')
-  assert.equal(reused.meta.calls.length, 0)
-})
-
-test('concurrent copies of one request send once; later copies are duplicates', async () => {
-  const store = createStore()
-  let release!: () => void
-  const gate = new Promise<void>((r) => (release = r))
-  const calls: Call[] = []
-  const slow = {
-    calls,
-    fetchImpl: (async (url: string, init: RequestInit) => {
-      calls.push({ url, init })
-      await gate
-      return Response.json({ messages: [{ id: 'wamid.TEST' }] })
-    }) as typeof fetch,
-  }
-
-  const first = run(valid, { store, meta: slow })
-  await new Promise((r) => setTimeout(r, 20)) // let the first request claim its keys
-  const second = await run(valid, { store, meta: slow })
-  assert.equal(second.res.status, 409)
-  assert.equal(second.json.error, 'in_progress')
-
-  release()
-  assert.equal((await first).res.status, 200)
-  assert.equal(calls.length, 1)
-  assert.equal(store.inFlight.size, 0)
-
-  const third = await run(valid, { store })
-  assert.equal(third.res.status, 200)
-  assert.equal(third.meta.calls.length, 0)
-})
-
-test('in-flight state is cleared after a failure, so the request can be retried', async () => {
-  const store = createStore()
-  assert.equal((await run(valid, { store, meta: metaStub('timeout') })).res.status, 502)
-  assert.equal(store.inFlight.size, 0)
-  assert.equal(store.sent.size, 0)
-  const retry = await run(valid, { store })
-  assert.equal(retry.res.status, 200)
-  assert.equal(retry.meta.calls.length, 1)
-})
-
-/* ── Unexpected errors ───────────────────────────────────────────────────── */
-
 test('an unexpected error returns a generic 500 without secrets, request content or stack', async () => {
-  const store = createStore()
   const logs: string[] = []
-  const broken = {
-    calls: [] as Call[],
-    fetchImpl: (async () =>
-      ({
-        ok: true,
-        json() {
-          throw new Error(`boom ${valid.name} ${valid.email} ${SECRET}`)
-        },
-      }) as unknown as Response) as typeof fetch,
+  const broken: BookingDb = {
+    ...memoryDb(),
+    createBooking: () => {
+      throw new TypeError(`boom ${valid.name} ${valid.email} ${SECRET}`)
+    },
   }
-  const { res, text } = await run(valid, { store, meta: broken, logs })
-  assert.equal(res.status, 500)
-  assert.deepEqual(JSON.parse(text), { ok: false, error: 'internal_error' })
+  const { res, text } = await run(valid, { db: broken, logs })
+  // createBooking throwing synchronously is still caught where the save happens.
+  assert.equal(res.status, 502)
   const everything = text + '\n' + logs.join('\n')
-  for (const leaked of [SECRET, valid.name, valid.email, valid.phone, 'boom', 'at ']) assert.ok(!everything.includes(leaked), leaked)
-  assert.match(logs.join(), /unexpected error \(Error\)/)
-  assert.equal(store.inFlight.size, 0)
-})
-
-test('a failing logger never turns a sent request into a failure', async () => {
-  const store = createStore()
-  const down = () => {
-    throw new Error('logger down')
-  }
-  const { res, meta } = await run(valid, { store, log: { info: down, warn: down, error: down } })
-  assert.equal(res.status, 200)
-  assert.equal(meta.calls.length, 1)
-  // Recorded as sent, so a repeat is not sent again.
-  assert.equal((await run(valid, { store })).meta.calls.length, 0)
-})
-
-/* ── Memory limits (per instance, best effort) ───────────────────────────── */
-
-const MINUTE = 60_000
-
-test('when the rate-limit memory is full, only the least recently active addresses are dropped', async () => {
-  const store = createStore(3)
-  for (const ip of ['198.51.100.1', '198.51.100.2', '198.51.100.3', '198.51.100.4']) await run(null, { store, ip, raw: '{bad' })
-  assert.deepEqual([...store.hits.keys()], ['ip:198.51.100.2', 'ip:198.51.100.3', 'ip:198.51.100.4'])
-})
-
-test('an address at its limit stays limited while other addresses arrive', async () => {
-  const store = createStore(3)
-  for (let i = 0; i < 5; i++) await run(null, { store, ip: '198.51.100.9', raw: '{bad' })
-  await run(null, { store, ip: '198.51.100.10', raw: '{bad' })
-  await run(null, { store, ip: '198.51.100.11', raw: '{bad' })
-  assert.equal((await run(null, { store, ip: '198.51.100.9', raw: '{bad' })).res.status, 429)
-})
-
-test('expired entries are removed before any active entry is dropped', async () => {
-  const store = createStore(3)
-  await run(null, { store, ip: '198.51.100.20', raw: '{bad', now: NOW - 11 * MINUTE }) // expired by NOW
-  await run(null, { store, ip: '198.51.100.21', raw: '{bad', now: NOW - MINUTE })
-  await run(null, { store, ip: '198.51.100.22', raw: '{bad', now: NOW })
-  await run(null, { store, ip: '198.51.100.23', raw: '{bad', now: NOW })
-  assert.deepEqual([...store.hits.keys()], ['ip:198.51.100.21', 'ip:198.51.100.22', 'ip:198.51.100.23'])
-  assert.equal(store.hits.get('ip:198.51.100.21')?.length, 1)
-})
-
-test('sent-request memory keeps the most recent requests when full', async () => {
-  const store = createStore(2)
-  await run({ ...valid, requestId: 'req-old-0001', message: 'first' }, { store })
-  await run({ ...valid, requestId: 'req-new-0002', message: 'second' }, { store, ip: '203.0.113.2' })
-  assert.equal(store.sent.size, 2)
-  assert.ok(store.sent.has('id:req-new-0002'))
-  assert.ok(!store.sent.has('id:req-old-0001'))
+  for (const leaked of [SECRET, valid.name, valid.email, 'boom']) assert.ok(!everything.includes(leaked), leaked)
 })

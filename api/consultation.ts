@@ -1,99 +1,44 @@
 /**
  * POST /api/consultation  (Vercel Function, server-side only)
  *
- * Receives a consultation request from the website form, validates it again on
- * the server, and sends one notification to the practice's WhatsApp number
- * through the Meta WhatsApp Cloud API, using an approved message template.
+ * Receives a booking from the website form, validates it again on the server,
+ * saves it in the database as Pending, and then notifies the doctor on WhatsApp
+ * through the Meta WhatsApp Cloud API (approved template).
  *
- * Secrets are read from server environment variables only (see .env.example).
- * Nothing here is bundled into the browser. Responses never include Meta
- * responses, credentials or internal details, and logs never include the
- * visitor's details.
+ * Order matters: the booking is saved first and the visitor gets a booking
+ * reference even if WhatsApp is down. A failed notification stays in the
+ * database as "failed" and can be retried (a retry of the same request, or the
+ * staff dashboard's Retry button) without ever sending twice.
  *
- * Success means Meta accepted the message for delivery. Delivery receipts would
- * need a webhook, which is not part of this endpoint.
+ * Secrets (Supabase service-role key, Meta token) come from server environment
+ * variables only. Responses never include them, Meta's replies or internal
+ * details, and logs never include the visitor's details.
  */
 
-const MAX_BODY_BYTES = 8 * 1024
+import { isOfferedType, isSlot, OFFERED_TYPES, type BookingInput } from './_lib/booking.ts'
+import { MAX_DAYS_AHEAD } from '../src/data/booking.ts'
+import { createRateLimiter, clientIp, fail, rateLimited, readJson, reply, safeLogger, sha256Hex, type Logger, type RateLimiter } from './_lib/http.ts'
+import { dbFromEnv, deliverNotification, type ServerEnv } from './_lib/notify.ts'
+import { DbError, type BookingDb, type CreateResult } from './_lib/db.ts'
+
 const RATE_LIMIT_MAX = 5
 const RATE_LIMIT_WINDOW_MS = 10 * 60_000
-const DUPLICATE_WINDOW_MS = 10 * 60_000
+/** At most this many bookings per phone number per day (enforced in the database). */
+const MAX_PER_PHONE_PER_DAY = 3
 const MIN_FILL_MS = 2500
-const META_TIMEOUT_MS = 10_000
-const DEFAULT_API_VERSION = 'v23.0'
-/** Meta rejects template messages whose filled-in body is too long; this keeps the parameters well inside it. */
-const TEMPLATE_PARAMS_BUDGET = 840
-
-const LIMITS = { name: 100, phone: 20, email: 254, message: 1000 } as const
-
-export const TIME_LABELS = {
-  morning: 'Morning',
-  midday: 'Midday',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-} as const
-
-type TimeKey = keyof typeof TIME_LABELS
-
-/** Own keys only: inherited names such as "toString" or "__proto__" are never valid. */
-const isTimeKey = (value: string): value is TimeKey => Object.hasOwn(TIME_LABELS, value)
+const LIMITS = { name: 100, email: 254, message: 1000 } as const
 
 /** The only keys the form sends. Anything else is rejected. */
-const ALLOWED_KEYS = new Set(['name', 'phone', 'email', 'date', 'time', 'message', 'consent', 'requestId', 'elapsedMs', 'website'])
-const TEXT_FIELDS = ['name', 'phone', 'email', 'date', 'time', 'message'] as const
+const ALLOWED_KEYS = new Set(['name', 'phone', 'email', 'date', 'slot', 'type', 'message', 'consent', 'requestId', 'elapsedMs', 'website'])
+const TEXT_FIELDS = ['name', 'phone', 'email', 'date', 'slot', 'message'] as const
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-
-export type Consultation = {
-  name: string
-  phone: string
-  email: string
-  /** YYYY-MM-DD or empty. */
-  date: string
-  /** A key of TIME_LABELS or empty. */
-  time: TimeKey | ''
-  message: string
-}
-
-export type Env = Partial<
-  Record<
-    | 'WHATSAPP_ACCESS_TOKEN'
-    | 'WHATSAPP_PHONE_NUMBER_ID'
-    | 'WHATSAPP_RECIPIENT_NUMBER'
-    | 'WHATSAPP_TEMPLATE_NAME'
-    | 'WHATSAPP_TEMPLATE_LANGUAGE'
-    | 'WHATSAPP_API_VERSION'
-    | 'ALLOWED_ORIGINS',
-    string | undefined
-  >
->
-
-type Logger = Pick<Console, 'info' | 'warn' | 'error'>
-
-/**
- * Per-instance memory for rate limiting and duplicate suppression. It is lost
- * when the instance stops and is not shared between instances, so it is a
- * best-effort guard, not a durable one.
- *
- * Maps are kept in order of last activity (oldest first), so when a map is
- * full the least recently used entries are dropped first.
- */
-export type Store = {
-  /** Request times per client address. */
-  hits: Map<string, number[]>
-  /** Sent requests, by request id and by content fingerprint. */
-  sent: Map<string, { at: number; fingerprint: string }>
-  /** Request ids and fingerprints currently being sent. */
-  inFlight: Set<string>
-  /** Upper bound on entries in `hits` and in `sent`. */
-  maxKeys: number
-}
-
-export const createStore = (maxKeys = 5000): Store => ({ hits: new Map(), sent: new Map(), inFlight: new Set(), maxKeys })
+export type Env = ServerEnv
 
 export type Options = {
   env: Env
-  store?: Store
+  /** The database; defaults to Supabase from the environment. */
+  db?: BookingDb | null
+  limiter?: RateLimiter
   fetch?: typeof fetch
   now?: () => number
   /** Used where the platform does not set x-real-ip / x-forwarded-for (local development). */
@@ -101,52 +46,39 @@ export type Options = {
   log?: Logger
 }
 
-const defaultStore = createStore()
-
-/* ── Responses ───────────────────────────────────────────────────────────── */
-
-const reply = (status: number, body: { ok: boolean; error?: string }, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-      ...headers,
-    },
-  })
-
-const fail = (status: number, error: string, headers?: Record<string, string>) => reply(status, { ok: false, error }, headers)
+const defaultLimiter = createRateLimiter(RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)
+export const createLimiter = () => createRateLimiter(RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)
 
 /* ── Input handling ──────────────────────────────────────────────────────── */
 
 // Control characters (except tab/newline) and bidirectional overrides.
 const UNSAFE_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F‪-‮⁦-⁩]/g
-
 const clean = (s: string) => s.replace(/\r\n?/g, '\n').replace(UNSAFE_CHARS, '')
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim()
 
-const PHONE_RE = /^[+()\d\s-]{7,20}$/
+/** "+91 98765 43210" -> "919876543210": a + then 8 to 15 digits, country code first. */
+const PHONE_RE = /^\+[\d\s()-]{8,22}$/
+export function normalisePhone(phone: string) {
+  if (!PHONE_RE.test(phone)) return null
+  const digits = phone.replace(/\D/g, '')
+  return /^[1-9]\d{7,14}$/.test(digits) ? digits : null
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 const REQUEST_ID_RE = /^[A-Za-z0-9-]{8,64}$/
-
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 
-/** A real calendar date, no earlier than yesterday in UTC (visitors' time zones differ). */
+/** A real calendar date from yesterday (UTC, as visitors' time zones differ) up to MAX_DAYS_AHEAD days ahead. */
 function validDate(date: string, now: number) {
   const m = DATE_RE.exec(date)
   if (!m) return false
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
-  const t = Date.UTC(y, mo - 1, d)
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
   if (isoDay(t) !== date) return false
-  return date >= isoDay(now - 86_400_000)
+  return date >= isoDay(now - 86_400_000) && date <= isoDay(now + (MAX_DAYS_AHEAD + 1) * 86_400_000)
 }
 
-type Parsed =
-  | { kind: 'ok'; data: Consultation; requestId: string }
-  | { kind: 'bot' }
-  | { kind: 'invalid'; fields: string[] }
+type Parsed = { kind: 'ok'; data: BookingInput; requestId: string } | { kind: 'bot' } | { kind: 'invalid'; fields: string[] }
 
 export function parseSubmission(body: unknown, now: number): Parsed {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { kind: 'invalid', fields: ['body'] }
@@ -157,177 +89,39 @@ export function parseSubmission(body: unknown, now: number): Parsed {
   if (typeof b.elapsedMs !== 'number' || !Number.isFinite(b.elapsedMs) || b.elapsedMs < MIN_FILL_MS) return { kind: 'bot' }
 
   const bad: string[] = []
-  // Only the keys the form sends, and every text field must actually be text ('' when left empty).
   if (Object.keys(b).some((k) => !ALLOWED_KEYS.has(k))) bad.push('body')
   for (const k of TEXT_FIELDS) if (typeof b[k] !== 'string') bad.push(k)
+  if (b.type !== undefined && typeof b.type !== 'string') bad.push('type')
   if (bad.length) return { kind: 'invalid', fields: bad }
 
   const str = (k: (typeof TEXT_FIELDS)[number]) => clean(b[k] as string)
   const name = oneLine(str('name'))
-  const phone = oneLine(str('phone'))
+  const phone = normalisePhone(oneLine(str('phone')))
   const email = oneLine(str('email'))
   const date = str('date').trim()
-  const time = str('time').trim()
+  const slot = str('slot').trim()
+  // With one type on offer the form does not ask; it is that type.
+  const type = b.type === undefined && OFFERED_TYPES.length === 1 ? OFFERED_TYPES[0] : b.type
   const message = str('message').trim()
   const requestId = typeof b.requestId === 'string' ? b.requestId : ''
 
   if (name.length < 2 || name.length > LIMITS.name) bad.push('name')
-  if (phone.length > LIMITS.phone || !PHONE_RE.test(phone) || phone.replace(/\D/g, '').length < 7) bad.push('phone')
-  // Email is optional; when given it must look like an address.
+  if (!phone) bad.push('phone')
   if (email && (email.length > LIMITS.email || !EMAIL_RE.test(email))) bad.push('email')
-  if (date && !validDate(date, now)) bad.push('date')
-  if (time && !isTimeKey(time)) bad.push('time')
+  if (!validDate(date, now)) bad.push('date')
+  if (!isSlot(slot)) bad.push('slot')
+  if (!isOfferedType(type)) bad.push('type')
   if (message.length > LIMITS.message) bad.push('message')
   if (b.consent !== true) bad.push('consent')
   if (!REQUEST_ID_RE.test(requestId)) bad.push('requestId')
-  if (bad.length) return { kind: 'invalid', fields: bad }
+  if (bad.length || !phone || !isSlot(slot) || !isOfferedType(type)) return { kind: 'invalid', fields: bad }
 
-  return { kind: 'ok', data: { name, phone, email, date, time: time as TimeKey | '', message }, requestId }
+  return { kind: 'ok', data: { name, phone, email, date, slot, type, message, consent: true }, requestId }
 }
 
-/* ── The WhatsApp message ────────────────────────────────────────────────── */
-
-export const formatDate = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number)
-  return `${d} ${MONTHS[m - 1]} ${y}`
-}
-
-/**
- * The template parameters. Only fields the visitor entered are included: the
- * optional ones are combined into one "details" line (template parameters
- * cannot contain line breaks and cannot be empty; consent is always present).
- */
-export function templateParameters(c: Consultation) {
-  const fixed = { name: c.name, phone: c.phone, email: c.email || 'Not provided' }
-  const parts: string[] = []
-  if (c.date) parts.push(`Preferred Date: ${formatDate(c.date)}`)
-  if (c.time) parts.push(`Preferred Time: ${TIME_LABELS[c.time]}`)
-  const consent = 'Consent: Yes'
-
-  if (c.message) {
-    const used = Object.values(fixed).join('').length + [...parts, consent].join(' · ').length + ' · Reason: '.length
-    const room = Math.max(120, TEMPLATE_PARAMS_BUDGET - used)
-    const flat = oneLine(c.message)
-    parts.push(`Reason: ${flat.length > room ? `${flat.slice(0, room - 14).trimEnd()}… (shortened)` : flat}`)
-  }
-  parts.push(consent)
-  return { ...fixed, details: parts.join(' · ') }
-}
-
-type SendResult = { ok: true } | { ok: false; reason: string }
-
-async function sendWhatsApp(c: Consultation, env: Required<Pick<Env, RequiredKey>> & Env, fetchImpl: typeof fetch, log: Logger): Promise<SendResult> {
-  const version = env.WHATSAPP_API_VERSION && /^v\d+\.\d+$/.test(env.WHATSAPP_API_VERSION) ? env.WHATSAPP_API_VERSION : DEFAULT_API_VERSION
-  const url = `https://graph.facebook.com/${version}/${encodeURIComponent(env.WHATSAPP_PHONE_NUMBER_ID)}/messages`
-  const params = templateParameters(c)
-
-  let res: Response
-  try {
-    res = await fetchImpl(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: env.WHATSAPP_RECIPIENT_NUMBER.replace(/\D/g, ''),
-        type: 'template',
-        template: {
-          name: env.WHATSAPP_TEMPLATE_NAME,
-          language: { code: env.WHATSAPP_TEMPLATE_LANGUAGE || 'en' },
-          components: [
-            {
-              type: 'body',
-              parameters: Object.entries(params).map(([parameter_name, text]) => ({ type: 'text', parameter_name, text })),
-            },
-          ],
-        },
-      }),
-      signal: AbortSignal.timeout(META_TIMEOUT_MS),
-    })
-  } catch (err) {
-    const timeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
-    log.error(`consultation: WhatsApp request ${timeout ? 'timed out' : 'could not connect'}`)
-    return { ok: false, reason: timeout ? 'timeout' : 'network' }
-  }
-
-  const data = (await res.json().catch(() => null)) as {
-    messages?: { id?: unknown }[]
-    error?: { code?: unknown; error_subcode?: unknown; fbtrace_id?: unknown }
-  } | null
-
-  if (res.ok && typeof data?.messages?.[0]?.id === 'string') return { ok: true }
-
-  // Codes and trace id only: Meta's error text can echo submitted values.
-  const e = data?.error
-  log.error(
-    `consultation: WhatsApp rejected the message (status ${res.status}, code ${String(e?.code ?? 'none')}, subcode ${String(e?.error_subcode ?? 'none')}, trace ${String(e?.fbtrace_id ?? 'none')})`,
-  )
-  return { ok: false, reason: 'rejected' }
-}
-
-/* ── Abuse controls (per instance) ───────────────────────────────────────── */
-
-/** Drops the least recently used entries (the front of the map) until it fits. */
-function trimOldest(map: Map<string, unknown>, max: number) {
-  for (const key of map.keys()) {
-    if (map.size <= max) break
-    map.delete(key)
-  }
-}
-
-function rateLimited(store: Store, key: string, now: number) {
-  const recent = (store.hits.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
-  recent.push(now)
-  // Re-insert so the map stays ordered by last activity.
-  store.hits.delete(key)
-  store.hits.set(key, recent)
-  trimOldest(store.hits, store.maxKeys)
-  return recent.length > RATE_LIMIT_MAX
-}
-
-/** Removes expired entries. The size cap is applied after this, so expired entries always go first. */
-function pruneExpired(store: Store, now: number) {
-  for (const [k, times] of store.hits) if (times.every((t) => now - t >= RATE_LIMIT_WINDOW_MS)) store.hits.delete(k)
-  for (const [k, v] of store.sent) if (now - v.at >= DUPLICATE_WINDOW_MS) store.sent.delete(k)
-}
-
-function recordSent(store: Store, keys: string[], fingerprint: string, now: number) {
-  for (const k of keys) {
-    store.sent.delete(k)
-    store.sent.set(k, { at: now, fingerprint })
-  }
-  trimOldest(store.sent, store.maxKeys)
-}
-
-async function contentFingerprint(c: Consultation) {
-  const text = [c.phone.replace(/\D/g, ''), c.email.toLowerCase(), c.date, c.time, oneLine(c.message)].join('|')
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function clientIp(request: Request, fallback?: string) {
-  return request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || fallback || 'unknown'
-}
-
-/** Same-origin only: ALLOWED_ORIGINS when set, otherwise the host the request was sent to. */
-function originAllowed(request: Request, env: Env) {
-  const origin = request.headers.get('origin')
-  if (!origin) return false
-  const allowed = (env.ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((s) => s.trim().replace(/\/+$/, ''))
-    .filter(Boolean)
-  if (allowed.length) return allowed.includes(origin)
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
-  try {
-    return !!host && new URL(origin).host === host
-  } catch {
-    return false
-  }
-}
-
-const REQUIRED = ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_RECIPIENT_NUMBER', 'WHATSAPP_TEMPLATE_NAME'] as const
-type RequiredKey = (typeof REQUIRED)[number]
+/** The same details always give the same fingerprint, whatever the request id. */
+export const fingerprintOf = (d: BookingInput) =>
+  sha256Hex([d.phone, d.name.toLowerCase(), d.email.toLowerCase(), d.date, d.slot, d.type, oneLine(d.message)].join('|'))
 
 /* ── Handler ─────────────────────────────────────────────────────────────── */
 
@@ -342,46 +136,21 @@ export async function handleConsultation(request: Request, opts: Options): Promi
   }
 }
 
-/** Logging can never turn a handled request into a failure. */
-function safeLogger(log: Logger): Logger {
-  const wrap = (fn: (message: string) => void) => (message: string) => {
-    try {
-      fn.call(log, message)
-    } catch {
-      /* a broken logger must not affect the response */
-    }
-  }
-  return { info: wrap(log.info), warn: wrap(log.warn), error: wrap(log.error) }
-}
-
 async function handle(request: Request, opts: Options, log: Logger): Promise<Response> {
   const { env } = opts
-  const store = opts.store ?? defaultStore
   const now = (opts.now ?? Date.now)()
+  const fetchImpl = opts.fetch ?? fetch
 
-  if (request.method !== 'POST') return fail(405, 'method_not_allowed', { Allow: 'POST' })
-  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return fail(415, 'unsupported_media_type')
-  if (!originAllowed(request, env)) return fail(403, 'forbidden')
-
-  const declared = Number(request.headers.get('content-length') ?? 0)
-  if (declared > MAX_BODY_BYTES) return fail(413, 'too_large')
-  const raw = await request.text()
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return fail(413, 'too_large')
-
-  pruneExpired(store, now)
-  if (rateLimited(store, `ip:${clientIp(request, opts.clientIp)}`, now)) {
+  // Every request counts towards the limit, including malformed ones.
+  if (rateLimited(opts.limiter ?? defaultLimiter, `ip:${clientIp(request, opts.clientIp)}`, now)) {
     log.warn('consultation: rate limit reached')
     return fail(429, 'rate_limited', { 'Retry-After': String(RATE_LIMIT_WINDOW_MS / 1000) })
   }
 
-  let body: unknown
-  try {
-    body = JSON.parse(raw)
-  } catch {
-    return fail(400, 'bad_request')
-  }
+  const read = await readJson(request, env.ALLOWED_ORIGINS)
+  if ('response' in read) return read.response
 
-  const parsed = parseSubmission(body, now)
+  const parsed = parseSubmission(read.body, now)
   if (parsed.kind === 'bot') {
     log.warn('consultation: rejected as automated')
     return fail(400, 'bad_request')
@@ -391,43 +160,46 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
     return fail(422, 'invalid')
   }
 
-  const missing = REQUIRED.filter((k) => !env[k])
-  if (missing.length) {
-    log.error(`consultation: WhatsApp is not configured (missing ${missing.join(', ')})`)
+  const db = opts.db === undefined ? dbFromEnv(env, fetchImpl) : opts.db
+  if (!db) {
+    log.error('consultation: database is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)')
     return fail(503, 'unavailable')
   }
 
-  const idKey = `id:${parsed.requestId}`
-  const fingerprint = await contentFingerprint(parsed.data)
-  const fpKey = `fp:${fingerprint}`
-
-  // No await between these checks and claiming the keys, so two concurrent requests cannot both pass.
-  const previous = store.sent.get(idKey)
-  if (previous && previous.fingerprint !== fingerprint) {
-    // The same request id with different details is never treated as the earlier request.
+  // 1. Save the booking. Nothing is sent unless this succeeds.
+  let created: CreateResult
+  try {
+    created = await db.createBooking(parsed.requestId, await fingerprintOf(parsed.data), parsed.data, MAX_PER_PHONE_PER_DAY)
+  } catch (err) {
+    // Only our own database errors carry a status code worth logging; anything else could hold request content.
+    log.error(`consultation: booking could not be saved (${err instanceof DbError ? err.message : err instanceof Error ? err.name : 'unknown'})`)
+    return fail(502, 'save_failed')
+  }
+  if (created.result === 'conflict') {
     log.warn('consultation: request id reused with different details')
     return fail(409, 'conflict')
   }
-  if (previous || store.sent.has(fpKey)) {
-    // A retry of a request that already went through, or the same details sent again.
-    log.info('consultation: duplicate suppressed')
-    return reply(200, { ok: true })
+  if (created.result === 'limited') {
+    log.warn('consultation: daily booking limit reached for a phone number')
+    return fail(429, 'too_many_bookings')
   }
-  if (store.inFlight.has(idKey) || store.inFlight.has(fpKey)) return fail(409, 'in_progress')
 
-  store.inFlight.add(idKey).add(fpKey)
-  let result: SendResult
+  const appointment = created.appointment
+  log.info(`consultation: booking ${created.result === 'created' ? 'saved' : 'already saved (repeat)'}`)
+
+  // 2. Notify the doctor, once. A repeat request only retries a notification that has not been sent.
+  let notified = false
   try {
-    result = await sendWhatsApp(parsed.data, env as Required<Pick<Env, RequiredKey>> & Env, opts.fetch ?? fetch, log)
-  } finally {
-    store.inFlight.delete(idKey)
-    store.inFlight.delete(fpKey)
+    const notification = await db.ensureNotification(appointment.id, 'doctor_new', `${appointment.id}:doctor_new`)
+    const outcome = await deliverNotification(db, notification.id, appointment, { env, fetch: fetchImpl, log })
+    notified = outcome === 'sent' || outcome === 'already_sent'
+  } catch (err) {
+    // The booking is saved; the notification can be retried from the staff dashboard.
+    log.error(`consultation: doctor notification error (${err instanceof Error ? err.name : 'unknown'})`)
   }
-  // Failures are not recorded, so the same request can be retried.
-  if (!result.ok) return fail(502, 'delivery_failed')
-  recordSent(store, [idKey, fpKey], fingerprint, now)
-  log.info('consultation: WhatsApp notification accepted by Meta')
-  return reply(200, { ok: true })
+
+  log.info(`consultation: doctor notification ${notified ? 'sent' : 'not sent; saved for retry'}`)
+  return reply(created.result === 'created' ? 201 : 200, { ok: true, bookingRef: appointment.booking_ref, status: 'pending' })
 }
 
 /** Vercel entry point. Other common methods get a 405 from the handler. */

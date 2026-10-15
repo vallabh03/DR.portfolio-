@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Navigate, Route, Routes, useLocation, useNavigationType, type NavigationType } from 'react-router'
 import SiteHeader from './components/SiteHeader'
 import Footer from './components/Footer'
 import MobileBookBar from './components/MobileBookBar'
+import WhatsAppButton from './components/WhatsAppButton'
 import Home from './pages/Home'
 import About from './pages/About'
 import Expertise from './pages/Expertise'
@@ -15,8 +16,10 @@ import GallerySectionPage from './pages/GallerySectionPage'
 import Contact from './pages/Contact'
 import Consultation from './pages/Consultation'
 import NotFound from './pages/NotFound'
+// Loaded only when /staff is opened, so visitors never download the Supabase client.
+const Staff = lazy(() => import('./pages/Staff'))
 import PageTransition from './components/PageTransition'
-import { BOOK_PATH, legacyRedirects } from './data/navigation'
+import { BOOK_PATH, legacyRedirects, STAFF_PATH } from './data/navigation'
 import { applyPageMeta } from './lib/head'
 
 /* ── Scroll positions per history entry, so Back/Forward return to where you were ── */
@@ -119,6 +122,14 @@ export default function App() {
               <Route path="/gallery/:section" element={<GallerySectionPage />} />
               <Route path="/contact" element={<Contact />} />
               <Route path={BOOK_PATH} element={<Consultation />} />
+              <Route
+                path={STAFF_PATH}
+                element={
+                  <Suspense fallback={null}>
+                    <Staff />
+                  </Suspense>
+                }
+              />
               {Object.entries(legacyRedirects).map(([from, to]) => (
                 <Route key={from} path={from} element={<Navigate to={to} replace />} />
               ))}
@@ -128,7 +139,12 @@ export default function App() {
         </AnimatePresence>
       </main>
       <Footer />
-      <MobileBookBar />
+      {location.pathname !== STAFF_PATH && (
+        <>
+          <MobileBookBar />
+          <WhatsAppButton />
+        </>
+      )}
     </>
   )
 }
