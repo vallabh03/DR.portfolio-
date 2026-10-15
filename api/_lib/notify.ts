@@ -14,6 +14,7 @@ export type ServerEnv = Partial<
   Record<
     | 'SUPABASE_URL'
     | 'SUPABASE_SERVICE_ROLE_KEY'
+    | 'SUPABASE_SECRET_KEY'
     | 'WHATSAPP_ACCESS_TOKEN'
     | 'WHATSAPP_PHONE_NUMBER_ID'
     | 'WHATSAPP_RECIPIENT_NUMBER'
@@ -31,8 +32,11 @@ export type ServerEnv = Partial<
 >
 
 /** The real database when it is configured, otherwise null. */
-export const dbFromEnv = (env: ServerEnv, fetchImpl: typeof fetch): BookingDb | null =>
-  env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY ? supabaseDb(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, fetchImpl) : null
+export function dbFromEnv(env: ServerEnv, fetchImpl: typeof fetch): BookingDb | null {
+  // SUPABASE_SECRET_KEY is accepted as another name for the service-role key.
+  const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY
+  return env.SUPABASE_URL && key ? supabaseDb(env.SUPABASE_URL, key, fetchImpl) : null
+}
 
 /** A notification stuck in "sending" this long (a crashed attempt) may be claimed again. */
 export const STALE_SENDING_SECONDS = 120

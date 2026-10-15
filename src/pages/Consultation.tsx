@@ -298,8 +298,8 @@ function IntakeDocument() {
     try {
       const bookingRef = await sendRequest(values, {
         requestId: requestId.current,
-        elapsedMs: Date.now() - startedAt.current,
-        website: honeypot.current?.value ?? '',
+        elapsedMs: Math.max(0, Date.now() - startedAt.current),
+        website: '',
       })
       requestId.current = null
       setRecord({ values, bookingRef })
@@ -358,12 +358,20 @@ function IntakeDocument() {
             <h2 id="request-title" className="sr-only">
               Consultation request
             </h2>
-            {/* Left empty by people; hidden from view, keyboard and screen readers */}
-            <div aria-hidden className="absolute -left-[9999px] h-px w-px overflow-hidden">
-              <label>
-                Website
-                <input ref={honeypot} type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
-              </label>
+            {/* Hidden honeypot field for bot scrapers; completely hidden from browser autofill */}
+            <div aria-hidden="true" style={{ display: 'none' }}>
+              <input
+                id="website-hp"
+                ref={honeypot}
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
+                defaultValue=""
+              />
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <Progress step={step} />

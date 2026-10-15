@@ -17,6 +17,19 @@
 -- gen_random_bytes for booking references. On Supabase pgcrypto is already installed in the extensions schema.
 create extension if not exists pgcrypto;
 
+-- An earlier, different appointments table (from 20261014_create_appointments.sql,
+-- since removed) has other columns. Stop with a clear message instead of
+-- silently keeping it. If it holds only test data, run first:
+--   drop table public.appointments cascade;
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'appointments' and column_name = 'preferred_time')
+     and not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'appointments' and column_name = 'booking_ref') then
+    raise exception 'public.appointments was created by the older 20261014 migration. Drop it (if it holds only test data) and run this script again.';
+  end if;
+end
+$$;
+
 -- ── Staff ────────────────────────────────────────────────────────────────────
 
 create table if not exists public.staff (

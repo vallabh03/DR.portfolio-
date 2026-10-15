@@ -26,6 +26,10 @@ Supabase service-role key. Patients cannot see any booking, including their own.
 1. Create a project at supabase.com (choose a region near India, e.g. Mumbai).
 2. **Create the tables:** Dashboard > SQL Editor > New query. Paste the whole of
    `supabase/migrations/20261015120000_appointments.sql` and click **Run**.
+   If an earlier version of the appointments table was already created (from the
+   removed `20261014_create_appointments.sql`), the script stops with a message;
+   if that table holds only test data, run `drop table public.appointments cascade;`
+   first and then run the script again.
    It creates:
    - `appointments`: booking reference, patient details, requested date/slot,
      consultation type, consent, status, scheduled date/slot, timestamps.
@@ -133,7 +137,7 @@ previews should use them), then redeploy. Locally: `.env.local`.
 | Variable | Where it is used | Secret? |
 |---|---|---|
 | `SUPABASE_URL` | Server functions | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server functions | **Yes** |
+| `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) | Server functions | **Yes** |
 | `VITE_SUPABASE_URL` | Staff dashboard (browser) | No |
 | `VITE_SUPABASE_ANON_KEY` | Staff dashboard (browser) | No (public by design) |
 | `WHATSAPP_ACCESS_TOKEN` | Server functions | **Yes** |
