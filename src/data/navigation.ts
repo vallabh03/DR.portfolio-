@@ -26,8 +26,6 @@ export const navRoutes: NavRoute[] = [
 ]
 
 export const BOOK_PATH = '/consultation'
-/** Staff dashboard for bookings: not linked anywhere and kept out of search. */
-export const STAFF_PATH = '/staff'
 export const BOOK_TITLE = 'Book a consultation'
 
 /** Old chapter URLs whose content now lives on another page. */

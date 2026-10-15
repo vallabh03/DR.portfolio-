@@ -7,8 +7,9 @@
  *
  * Order matters: the booking is saved first and the visitor gets a booking
  * reference even if WhatsApp is down. A failed notification stays in the
- * database as "failed" and can be retried (a retry of the same request, or the
- * staff dashboard's Retry button) without ever sending twice.
+ * database as "failed" and is retried later (a retry of the same request, or
+ * the daily retry job in api/cron/retry-notifications.ts) without ever sending
+ * twice or creating a second booking.
  *
  * Secrets (Supabase service-role key, Meta token) come from server environment
  * variables only. Responses never include them, Meta's replies or internal
@@ -194,7 +195,7 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
     const outcome = await deliverNotification(db, notification.id, appointment, { env, fetch: fetchImpl, log })
     notified = outcome === 'sent' || outcome === 'already_sent'
   } catch (err) {
-    // The booking is saved; the notification can be retried from the staff dashboard.
+    // The booking is saved; the daily retry job will try the notification again.
     log.error(`consultation: doctor notification error (${err instanceof Error ? err.name : 'unknown'})`)
   }
 
