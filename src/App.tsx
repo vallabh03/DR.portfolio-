@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Navigate, Route, Routes, useLocation, useNavigationType, type NavigationType } from 'react-router'
+import { Analytics } from '@vercel/analytics/react'
 import SiteHeader from './components/SiteHeader'
 import Footer from './components/Footer'
 import MobileBookBar from './components/MobileBookBar'
@@ -132,6 +133,7 @@ export default function App() {
       <Footer />
       <MobileBookBar />
       <WhatsAppButton />
+      <Analytics />
     </>
   )
 }
