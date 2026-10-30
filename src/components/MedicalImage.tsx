@@ -83,7 +83,8 @@ export default function MedicalImage({
             hoverZoom ? 'group-hover:scale-[1.02]' : ''
           }`}
         >
-          {(status !== 'loaded' || !src) && <Placeholder label={placeholderLabel} file={file} alt={alt} />}
+          {/* The placeholder stands in only when there is no photo or it fails; while a photo loads, the frame's background shows. */}
+          {(!src || status === 'error') && <Placeholder label={placeholderLabel} file={file} alt={alt} />}
           {src && status !== 'error' && (
             <picture>
               {/* AVIF, then WebP, then the original, only for images the optimiser has processed */}

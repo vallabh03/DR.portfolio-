@@ -8,9 +8,11 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
+    "build": "tsc -b && tsc -p tsconfig.server.json && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr && vite build --ssr src/data/seo.ts --outDir dist-ssr --emptyOutDir false && node scripts/prerender.mjs",
     "preview": "vite preview",
     "images": "node scripts/optimize-images.mjs",
+    "seo": "node scripts/seo-audit.mjs",
+    "seo:check": "node scripts/seo-audit.mjs",
     "test": "node --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
