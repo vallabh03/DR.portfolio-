@@ -72,3 +72,36 @@ export async function sendTemplate(
   log.error(`whatsapp: message rejected (${error})`)
   return { ok: false, error }
 }
+
+/** WhatsApp's limit for a text message body. */
+export const MAX_TEXT_LENGTH = 4096
+
+/**
+ * Sends a plain text message. Allowed only as a reply within 24 hours of the
+ * recipient's last message to the business number (WhatsApp's customer
+ * service window), which is how the booking bot uses it.
+ */
+export async function sendText(config: WhatsAppConfig, message: { to: string; body: string }, fetchImpl: typeof fetch, log: Logger): Promise<SendResult> {
+  const version = config.apiVersion && /^v\d+\.\d+$/.test(config.apiVersion) ? config.apiVersion : DEFAULT_API_VERSION
+  const url = `https://graph.facebook.com/${version}/${encodeURIComponent(config.phoneNumberId)}/messages`
+  const body = message.body.length > MAX_TEXT_LENGTH ? `${message.body.slice(0, MAX_TEXT_LENGTH - 2)}…` : message.body
+  let res: Response
+  try {
+    res = await fetchImpl(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: message.to.replace(/\D/g, ''), type: 'text', text: { preview_url: false, body } }),
+      signal: AbortSignal.timeout(META_TIMEOUT_MS),
+    })
+  } catch (err) {
+    const timeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    log.error(`whatsapp: reply ${timeout ? 'timed out' : 'could not connect'}`)
+    return { ok: false, error: timeout ? 'timeout' : 'network' }
+  }
+  const data = (await res.json().catch(() => null)) as { messages?: { id?: unknown }[]; error?: { code?: unknown; fbtrace_id?: unknown } } | null
+  const id = data?.messages?.[0]?.id
+  if (res.ok && typeof id === 'string') return { ok: true, messageId: id }
+  const error = `meta status ${res.status}, code ${String(data?.error?.code ?? 'none')}, trace ${String(data?.error?.fbtrace_id ?? 'none')}`
+  log.error(`whatsapp: reply rejected (${error})`)
+  return { ok: false, error }
+}
