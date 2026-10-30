@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { MotionConfig } from 'motion/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import '@fontsource-variable/newsreader/opsz.css'
 import '@fontsource-variable/inter/wght.css'
 import './styles/globals.css'
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <MotionConfig reducedMotion="user">
           <App />
+          <SpeedInsights />
         </MotionConfig>
       </ThemeProvider>
     </BrowserRouter>
