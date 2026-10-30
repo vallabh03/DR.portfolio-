@@ -55,6 +55,8 @@ export default function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; on
     }
   }, [doc, onClose])
 
+  // Nothing to portal when the page is rendered at build time (no document).
+  if (typeof document === 'undefined') return null
   return createPortal(
     <AnimatePresence>
       {doc && (

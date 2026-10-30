@@ -86,7 +86,7 @@ without having written to the business number first. Review can take up to
 24 hours. With Meta's **test** sending number, the doctor's number must first be
 added as a test recipient (WhatsApp > API Setup).
 
-### Optional: delivery receipts (webhook)
+### Webhook: delivery receipts and the booking assistant
 
 In the Meta app > WhatsApp > Configuration > Webhook:
 - Callback URL: `https://www.drabhinavthaduri.in/api/whatsapp-webhook`
@@ -95,8 +95,30 @@ In the Meta app > WhatsApp > Configuration > Webhook:
 - App secret (App settings > Basic) → `WHATSAPP_APP_SECRET`. Every webhook call
   is checked against it; unsigned calls are refused.
 
-The `notifications` table then shows `delivered`, `read` or `failed` in
-`delivery_status`.
+With the webhook on:
+
+- The `notifications` table shows `delivered`, `read` or `failed` in
+  `delivery_status`.
+- **Booking assistant:** the doctor sends a message to the practice's WhatsApp
+  Business number (the number the notifications come from) and gets the
+  bookings back from Supabase:
+
+  | Send | Reply |
+  |---|---|
+  | `today` | Bookings requested for today (India time), in time-slot order |
+  | `tomorrow` | Bookings for tomorrow |
+  | `week` | Bookings for the next 7 days |
+  | `pending` | All pending bookings, newest first |
+  | `AT-7K3F9Q` | Full details of that booking, including the patient's message |
+  | `help` (or `hi`) | The list of commands |
+
+  Lists show the reference, time slot, name, mobile number, type and status, at
+  most 15 at a time; the patient's message appears only when one booking is
+  asked for by reference. Only the doctor's number (`WHATSAPP_RECIPIENT_NUMBER`)
+  and numbers in `WHATSAPP_ALLOWED_NUMBERS` get answers; every other sender is
+  ignored and never receives booking data. Replies are ordinary text messages,
+  which WhatsApp allows within 24 hours of the doctor's message, so no template
+  is needed. The assistant only reads; it never changes a booking.
 
 ## 3. Vercel
 
@@ -114,7 +136,8 @@ Production (and Preview if previews should save real bookings), then redeploy.
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Template language code, e.g. `en` | No |
 | `CRON_SECRET` | Lets only Vercel's scheduler run the daily retry (any long random text) | **Yes** |
 | `WHATSAPP_API_VERSION` | Optional, defaults to `v23.0` | No |
-| `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Optional webhook | **Yes** |
+| `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Webhook (receipts and booking assistant) | **Yes** |
+| `WHATSAPP_ALLOWED_NUMBERS` | Optional: more numbers allowed to ask the assistant, comma-separated | No |
 | `ALLOWED_ORIGINS` | Optional, e.g. `https://www.drabhinavthaduri.in` | No |
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are no longer used and can be

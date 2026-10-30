@@ -46,6 +46,7 @@ const entryKey = (key: string, pathname: string) => (key === 'default' ? `defaul
 
 /** On first load, restore only for a reload or a browser Back/Forward into the site. */
 const firstLoadRestores = () => {
+  if (typeof performance === 'undefined' || !performance.getEntriesByType) return false
   const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
   return nav?.type === 'reload' || nav?.type === 'back_forward'
 }

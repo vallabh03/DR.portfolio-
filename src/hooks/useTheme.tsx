@@ -13,7 +13,7 @@ type ThemeCtx = {
 const ThemeContext = createContext<ThemeCtx | null>(null)
 
 /** Light is the default; index.html applies any stored choice before first paint. */
-const readInitial = (): Theme => (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light')
+const readInitial = (): Theme => (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light')
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(readInitial)

@@ -34,6 +34,8 @@ function headTags(page: PageMeta) {
     `<meta name="description" content="${escape(page.description)}" />`,
     `<meta name="robots" content="${page.noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large'}" />`,
     `<meta name="author" content="${escape(doctor.name)}" />`,
+    // Optional Google Search Console HTML-tag verification, from the build environment (not a secret).
+    process.env.GOOGLE_SITE_VERIFICATION && `<meta name="google-site-verification" content="${escape(process.env.GOOGLE_SITE_VERIFICATION)}" />`,
     known && `<link rel="canonical" href="${url}" />`,
     `<meta property="og:type" content="${page.path === '/' ? 'profile' : 'website'}" />`,
     `<meta property="og:site_name" content="${escape(doctor.name)}" />`,
@@ -61,7 +63,8 @@ function noscriptBody(page: PageMeta) {
   const links = [...navRoutes.map((r) => ({ path: r.path, label: r.label })), { path: BOOK_PATH, label: BOOK_TITLE }]
   return [
     `<div style="padding:2rem;font-family:sans-serif;max-width:48rem">`,
-    `<h1>${escape(page.title)}</h1>`,
+    // Not a heading: the prerendered page already has its own H1.
+    `<p><strong>${escape(page.title)}</strong></p>`,
     `<p>${escape(page.description)}</p>`,
     `<nav aria-label="Pages"><ul>${links.map((l) => `<li><a href="${l.path}">${escape(l.label)}</a></li>`).join('')}</ul></nav>`,
     `<p>Please enable JavaScript to view the full website.</p>`,
@@ -103,7 +106,8 @@ export default function seoPages(): Plugin {
       },
     },
     async closeBundle() {
-      if (config.command !== 'build') return
+      // The server build (src/entry-server.tsx) writes no pages of its own.
+      if (config.command !== 'build' || config.build.ssr) return
       const outDir = path.resolve(config.root, config.build.outDir)
       const template = await readFile(path.join(outDir, 'index.html'), 'utf8')
       for (const page of [...pages, notFoundPage]) {

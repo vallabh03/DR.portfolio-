@@ -3,6 +3,12 @@
   "crons": [{ "path": "/api/cron/retry-notifications", "schedule": "0 3 * * *" }],
   "trailingSlash": false,
   "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "dr-portfolio-kohl.vercel.app" }],
+      "destination": "https://www.drabhinavthaduri.in/:path*",
+      "permanent": true
+    },
     { "source": "/credentials", "destination": "/research", "permanent": true },
     { "source": "/approach", "destination": "/about", "permanent": true },
     { "source": "/testimonials", "destination": "/", "permanent": true },

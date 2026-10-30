@@ -24,6 +24,7 @@ export type ServerEnv = Partial<
     | 'WHATSAPP_APP_SECRET'
     | 'WHATSAPP_WEBHOOK_VERIFY_TOKEN'
     | 'CRON_SECRET'
+    | 'WHATSAPP_ALLOWED_NUMBERS'
     | 'ALLOWED_ORIGINS',
     string | undefined
   >

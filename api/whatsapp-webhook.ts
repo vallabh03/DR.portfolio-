@@ -1,26 +1,67 @@
 /**
  * GET/POST /api/whatsapp-webhook  (Vercel Function, called by Meta only)
  *
- * Records delivery receipts for the WhatsApp notifications: Meta reports each
- * message as sent, delivered, read or failed, and the matching notification row
- * is updated (delivery_status, delivery_error). Optional: bookings and
- * notifications work without it; it adds the "delivered/read" detail.
+ * Two jobs, both optional (bookings and notifications work without them):
+ *
+ * 1. Delivery receipts: Meta reports each sent message as sent, delivered,
+ *    read or failed, and the matching notification row is updated.
+ * 2. Booking assistant: when an allowed number (the doctor's, plus
+ *    WHATSAPP_ALLOWED_NUMBERS) sends a command such as "today" or "AT-7K3F9Q"
+ *    to the practice's WhatsApp number, the reply lists those bookings from
+ *    Supabase (api/_lib/bot.ts). Messages from any other number are ignored and
+ *    never receive booking data.
  *
  * - GET answers Meta's one-time subscription check (WHATSAPP_WEBHOOK_VERIFY_TOKEN).
  * - POST is accepted only with a valid X-Hub-Signature-256 made with the app
- *   secret (WHATSAPP_APP_SECRET), so nobody else can change delivery records.
- * Only message ids, statuses and error codes are read; nothing is logged about patients.
+ *   secret (WHATSAPP_APP_SECRET), so nobody else can trigger replies or change
+ *   delivery records.
+ * Logs hold counts and outcomes only: never numbers, names or message text.
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { fail, safeLogger, type Logger } from './_lib/http.ts'
-import { dbFromEnv, type ServerEnv } from './_lib/notify.ts'
+import { dbFromEnv, whatsappConfig, type ServerEnv } from './_lib/notify.ts'
 import type { BookingDb } from './_lib/db.ts'
+import { allowedNumbers, HELP_TEXT, parseCommand, replyFor } from './_lib/bot.ts'
+import { sendText } from './_lib/whatsapp.ts'
 
 const MAX_BODY_BYTES = 256 * 1024
 const STATUSES = new Set(['sent', 'delivered', 'read', 'failed'])
 
-export type WebhookOptions = { env: ServerEnv; db?: BookingDb | null; fetch?: typeof fetch; log?: Logger }
+export type WebhookOptions = {
+  env: ServerEnv
+  db?: BookingDb | null
+  fetch?: typeof fetch
+  now?: () => number
+  log?: Logger
+  /** Message ids already answered (Meta can deliver the same webhook twice). */
+  seen?: Set<string>
+}
+
+/** Per-instance memory of answered message ids, so a repeated webhook does not reply twice. */
+const answered = new Set<string>()
+const remember = (seen: Set<string>, id: string) => {
+  seen.add(id)
+  if (seen.size > 2000) seen.delete(seen.values().next().value as string)
+}
+
+type IncomingMessage = { id: string; from: string; text: string | null }
+
+/** Messages sent to the business number; anything unexpected is ignored. */
+export function incomingMessages(payload: unknown): IncomingMessage[] {
+  const out: IncomingMessage[] = []
+  const entries = (payload as { entry?: unknown })?.entry
+  if (!Array.isArray(entries)) return out
+  for (const entry of entries) {
+    for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
+      for (const m of Array.isArray(change?.value?.messages) ? change.value.messages : []) {
+        if (typeof m?.id !== 'string' || typeof m?.from !== 'string') continue
+        out.push({ id: m.id, from: m.from.replace(/\D/g, ''), text: m.type === 'text' && typeof m.text?.body === 'string' ? m.text.body.slice(0, 200) : null })
+      }
+    }
+  }
+  return out
+}
 
 export function signatureValid(raw: string, header: string | null, secret: string) {
   const expected = `sha256=${createHmac('sha256', secret).update(raw, 'utf8').digest('hex')}`
@@ -80,19 +121,48 @@ export async function handleWebhook(request: Request, opts: WebhookOptions): Pro
       return fail(400, 'bad_request')
     }
     const updates = statusUpdates(payload)
-    const db = opts.db === undefined ? dbFromEnv(env, opts.fetch ?? fetch) : opts.db
-    if (updates.length && !db) {
+    const messages = incomingMessages(payload)
+    const fetchImpl = opts.fetch ?? fetch
+    const db = opts.db === undefined ? dbFromEnv(env, fetchImpl) : opts.db
+    if ((updates.length || messages.length) && !db) {
       log.error('webhook: database is not configured')
       // A non-2xx answer makes Meta retry the delivery later.
       return fail(503, 'unavailable')
     }
     for (const u of updates) await db!.recordDelivery(u.id, u.status, u.error)
     if (updates.length) log.info(`webhook: ${updates.length} delivery update(s) recorded`)
+
+    if (messages.length) await answer(messages, db!, opts, fetchImpl, log)
     return new Response(null, { status: 200 })
   } catch (err) {
     log.error(`webhook: unexpected error (${err instanceof Error ? err.name : typeof err})`)
     return fail(500, 'internal_error')
   }
+}
+
+/** Replies to commands from allowed numbers; everything else is ignored. */
+async function answer(messages: IncomingMessage[], db: BookingDb, opts: WebhookOptions, fetchImpl: typeof fetch, log: Logger) {
+  const allowed = allowedNumbers(opts.env)
+  const seen = opts.seen ?? answered
+  const config = whatsappConfig(opts.env)
+  let ignored = 0
+  for (const m of messages) {
+    if (!allowed.has(m.from)) {
+      ignored++
+      continue
+    }
+    if (seen.has(m.id)) continue
+    remember(seen, m.id)
+    if (!config) {
+      log.error('webhook: WhatsApp is not configured, so the assistant cannot reply')
+      return
+    }
+    const command = m.text === null ? { kind: 'help' as const } : parseCommand(m.text, (opts.now ?? Date.now)())
+    const body = m.text === null ? `I can only read text messages.\n\n${HELP_TEXT}` : await replyFor(command, db)
+    const sent = await sendText(config, { to: m.from, body }, fetchImpl, log)
+    log.info(`webhook: assistant ${command.kind} command ${sent.ok ? 'answered' : 'reply failed'}`)
+  }
+  if (ignored) log.info(`webhook: ignored ${ignored} message(s) from numbers not on the allow list`)
 }
 
 export function GET(request: Request) {

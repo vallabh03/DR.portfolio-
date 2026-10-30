@@ -30,6 +30,12 @@ export interface BookingDb {
   listRetryable(maxAttempts: number, since: string, limit: number): Promise<Notification[]>
   /** Delivery receipts from Meta's webhook. */
   recordDelivery(messageId: string, status: string, error?: string): Promise<void>
+  /** Bookings requested for dates from `from` to `to` (YYYY-MM-DD, inclusive), not rejected, up to `limit`. */
+  bookingsBetween(from: string, to: string, limit: number): Promise<Appointment[]>
+  /** Pending bookings, newest first, up to `limit`. */
+  pendingBookings(limit: number): Promise<Appointment[]>
+  /** One booking by its reference (e.g. AT-7K3F9Q), or null. */
+  bookingByRef(ref: string): Promise<Appointment | null>
 }
 
 export class DbError extends Error {
@@ -116,6 +122,13 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
         body: JSON.stringify({ delivery_status: status, delivery_error: error ?? null }),
       })
     },
+
+    bookingsBetween: async (from, to, limit) =>
+      (await call<Appointment[]>(
+        `/rest/v1/appointments?requested_date=gte.${from}&requested_date=lte.${to}&status=neq.rejected&order=requested_date.asc,created_at.asc&limit=${limit}&select=*`,
+      )) ?? [],
+    pendingBookings: async (limit) => (await call<Appointment[]>(`/rest/v1/appointments?status=eq.pending&order=created_at.desc&limit=${limit}&select=*`)) ?? [],
+    bookingByRef: (ref) => one<Appointment>(`/rest/v1/appointments?booking_ref=${eq(ref)}&select=*`),
   }
 }
 
@@ -232,6 +245,23 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
 
     async recordDelivery(messageId, status, error) {
       for (const n of notifications.values()) if (n.meta_message_id === messageId) Object.assign(n, { delivery_status: status, delivery_error: error ?? null })
+    },
+
+    bookingsBetween: async (from, to, limit) =>
+      [...appointments.values()]
+        .filter((a) => a.requested_date >= from && a.requested_date <= to && a.status !== 'rejected')
+        .sort((x, y) => x.requested_date.localeCompare(y.requested_date) || x.createdAt - y.createdAt)
+        .slice(0, limit)
+        .map(copy),
+    pendingBookings: async (limit) =>
+      [...appointments.values()]
+        .filter((a) => a.status === 'pending')
+        .sort((x, y) => y.createdAt - x.createdAt)
+        .slice(0, limit)
+        .map(copy),
+    bookingByRef: async (ref) => {
+      const a = [...appointments.values()].find((x) => x.booking_ref === ref)
+      return a ? copy(a) : null
     },
   }
 }
