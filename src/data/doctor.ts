@@ -135,7 +135,15 @@ export type Doctor = {
   testimonials: Testimonial[]
   contact: Contact
   booking: { endpoint: string }
-  seo: { siteUrl: string }
+  seo: {
+    siteUrl: string
+    /**
+     * Public profiles about the doctor, used only in structured data ("sameAs")
+     * so search engines connect them to this site. List only pages that are
+     * about him; the doctor should confirm each one.
+     */
+    profiles: string[]
+  }
 }
 
 /** Credential categories that the About page also lists as Education and Training. */
@@ -420,6 +428,8 @@ export const doctor: Doctor = {
 
   seo: {
     siteUrl: 'https://www.drabhinavthaduri.in',
+    // Found 30 October 2026: his consultant page at Continental Hospitals and his Google Scholar profile.
+    profiles: ['https://continentalhospitals.com/doctors/dr-abhinav-thaduri/', 'https://scholar.google.com/citations?user=76O8qa0AAAAJ'],
   },
 }
 
