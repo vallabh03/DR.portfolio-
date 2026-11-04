@@ -1,40 +1,4 @@
-import { motion } from 'motion/react'
-import { useLocation } from 'react-router'
 import { whatsappUrl } from '../data/doctor'
-import { BOOK_PATH } from '../data/navigation'
-import { useScrolledPast } from '../hooks/useScrolledPast'
-import { EASE } from '../lib/motion'
-
-/**
- * A round WhatsApp button fixed to the bottom-right corner of every page; it
- * opens a chat with the practice (the app on phones, WhatsApp Web elsewhere).
- * On phones it rises above the booking bar whenever that bar is showing. It
- * sits below the cookie notice (z-30 vs z-40) until that is answered.
- */
-export default function WhatsAppButton() {
-  const { pathname } = useLocation()
-  // The same rule MobileBookBar uses to decide when it is on screen.
-  const barShowing = useScrolledPast(480) && pathname !== BOOK_PATH
-  if (!whatsappUrl) return null
-
-  return (
-    <motion.a
-      href={whatsappUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Chat on WhatsApp (opens WhatsApp)"
-      title="Chat on WhatsApp"
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.4, ease: EASE, delay: 0.6 }}
-      className={`fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_12px_28px_-8px_rgba(0,0,0,0.45)] transition-[bottom,transform] duration-300 hover:scale-105 focus-visible:outline-offset-4 sm:right-6 md:bottom-6 ${
-        barShowing ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))]' : 'bottom-[calc(1rem+env(safe-area-inset-bottom))]'
-      }`}
-    >
-      <WhatsAppIcon className="h-8 w-8" />
-    </motion.a>
-  )
-}
 
 /** The WhatsApp glyph (speech bubble with handset), drawn in the current text colour. */
 export function WhatsAppIcon({ className = '' }: { className?: string }) {
