@@ -118,7 +118,7 @@ export const pages: PageMeta[] = [
   {
     path: '/contact',
     title: `Contact ${doctor.name} | Head and Neck Surgeon, ${city}`,
-    description: `Contact ${doctor.name}, ${role} at ${practice}, by telephone, WhatsApp or email.`,
+    description: `Contact ${doctor.name}, ${role} at ${practice}, by telephone or email.`,
     schemaType: 'ContactPage',
     crumbs: [{ name: 'Contact', path: '/contact' }],
   },
