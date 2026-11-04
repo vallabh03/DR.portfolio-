@@ -1,0 +1,7 @@
+{
+  // Settings for the server functions in api/, which Vercel type-checks on its
+  // own with the nearest tsconfig.json. Without this file it uses the root one,
+  // which is for the browser app and asks for Vite's client types.
+  "extends": "../tsconfig.server.json",
+  "include": [".", "../src/data"]
+}
