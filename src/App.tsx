@@ -5,7 +5,6 @@ import { Analytics } from '@vercel/analytics/react'
 import SiteHeader from './components/SiteHeader'
 import Footer from './components/Footer'
 import MobileBookBar from './components/MobileBookBar'
-import WhatsAppButton from './components/WhatsAppButton'
 import Home from './pages/Home'
 import About from './pages/About'
 import Expertise from './pages/Expertise'
@@ -132,7 +131,6 @@ export default function App() {
       </main>
       <Footer />
       <MobileBookBar />
-      <WhatsAppButton />
       <Analytics />
     </>
   )
