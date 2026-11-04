@@ -7,7 +7,6 @@ import { EASE, EASE_EXIT, EASE_IN_OUT, useDecorativeMotion, useEntrance } from '
 import RevealText from '../components/RevealText'
 import DrawLine from '../components/DrawLine'
 import Button, { ArrowRight } from '../components/Button'
-import { WhatsAppChatLink } from '../components/WhatsAppButton'
 
 /**
  * Consultation: an intake document. Three numbered parts with a label column,
@@ -144,8 +143,6 @@ function Opening() {
             Share a few details and the practice will be in touch to arrange a suitable time. Submitting this form sends a request. It
             is not a confirmed appointment.
           </p>
-          <p className="mt-5 text-sm text-muted">Prefer to message the practice directly?</p>
-          <WhatsAppChatLink className="mt-3 w-full sm:w-auto" />
         </motion.div>
       </div>
     </section>
