@@ -1,5 +1,6 @@
 /** Shared stand-ins for the server tests (not a test file itself). */
 import type { Env } from '../api/consultation.ts'
+import { memoryDb, type MemoryDb } from '../api/_lib/db.ts'
 
 export const SECRET = 'test-token-not-real'
 
@@ -26,3 +27,14 @@ export function metaStub(kind: 'sent' | 'rejected' | 'network' | 'timeout') {
   return { calls, fetchImpl }
 }
 
+
+/**
+ * The in-memory database with only the practice's new-booking alert switched
+ * on: for tests about that alert, which count the messages sent. The patient's
+ * messages are covered in notificationSettings.test.ts.
+ */
+export function practiceOnlyDb(now?: () => number): MemoryDb {
+  const db = memoryDb(now)
+  for (const s of db.settings) if (s.audience === 'customer') s.enabled = false
+  return db
+}

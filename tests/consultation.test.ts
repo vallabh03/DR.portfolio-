@@ -8,8 +8,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createLimiter, handleConsultation, normalisePhone, type Env } from '../api/consultation.ts'
-import { memoryDb, type BookingDb, type MemoryDb } from '../api/_lib/db.ts'
-import { ENV, metaStub, SECRET, type Call } from './helpers.ts'
+import { type BookingDb, type MemoryDb } from '../api/_lib/db.ts'
+import { ENV, metaStub, practiceOnlyDb as memoryDb, SECRET, type Call } from './helpers.ts'
 
 const NOW = Date.UTC(2026, 9, 6, 12)
 const ORIGIN = 'https://www.example.test'
@@ -96,7 +96,8 @@ test('a valid booking is saved as pending, gets a reference, and the doctor is n
   ])
 
   const [n] = [...db.notifications.values()]
-  assert.equal(n.kind, 'doctor_new')
+  assert.equal(n.kind, 'booking_received:admin')
+  assert.equal(n.recipient, '919000000000')
   assert.equal(n.status, 'sent')
   assert.equal(n.meta_message_id, 'wamid.TEST-1')
   assert.equal(n.attempts, 1)

@@ -12,7 +12,8 @@ export const isOfferedType = (value: unknown): value is ConsultationType => type
 export type Status = 'pending' | 'confirmed' | 'rescheduled' | 'rejected'
 export const STATUS_LABELS: Record<Status, string> = { pending: 'Pending', confirmed: 'Confirmed', rescheduled: 'Rescheduled', rejected: 'Rejected' }
 
-export type NotificationKind = 'doctor_new' | 'patient_confirmed' | 'patient_rescheduled' | 'patient_rejected'
+/** "event:audience", e.g. "booking_confirmed:customer" (api/_lib/events.ts); older rows may hold "doctor_new" and similar. */
+export type NotificationKind = string
 export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'skipped'
 
 export type Appointment = {
@@ -42,6 +43,8 @@ export type Notification = {
   id: string
   appointment_id: string
   kind: NotificationKind
+  /** Digits only, country code first; null on rows written before notifications were configurable. */
+  recipient?: string | null
   idempotency_key: string
   status: NotificationStatus
   attempts: number

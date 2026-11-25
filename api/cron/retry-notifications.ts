@@ -1,8 +1,9 @@
 /**
  * GET /api/cron/retry-notifications  (Vercel Cron Job, server-side only)
  *
- * Sends the doctor's WhatsApp notification again for bookings whose first
- * attempt failed (Meta down, token expired, settings missing). Runs once a day
+ * Sends WhatsApp notifications again whose first attempt failed (provider
+ * down, token expired, settings missing); one switched off in the settings
+ * table meanwhile is skipped instead. Runs once a day
  * (vercel.json "crons"); bookings are never touched, only their notification
  * rows. Each row is claimed in the database before sending, so this job, a
  * patient's retried request and another instance can never send it twice.
@@ -12,10 +13,9 @@
  * counts only, never patient details.
  */
 
-import { fail, reply, safeLogger, type Logger } from '../_lib/http.ts'
+import { cronAuthorised, fail, reply, safeLogger, type Logger } from '../_lib/http.ts'
 import { dbFromEnv, deliverNotification, type ServerEnv } from '../_lib/notify.ts'
 import type { BookingDb } from '../_lib/db.ts'
-import { timingSafeEqual } from 'node:crypto'
 
 /** Give up on a notification after this many attempts in total. */
 export const MAX_ATTEMPTS = 5
@@ -26,12 +26,6 @@ const BATCH = 20
 
 export type RetryOptions = { env: ServerEnv; db?: BookingDb | null; fetch?: typeof fetch; now?: () => number; log?: Logger }
 
-function authorised(request: Request, secret: string) {
-  const expected = Buffer.from(`Bearer ${secret}`)
-  const given = Buffer.from(request.headers.get('authorization') ?? '')
-  return given.length === expected.length && timingSafeEqual(given, expected)
-}
-
 export async function handleRetryJob(request: Request, opts: RetryOptions): Promise<Response> {
   const log = safeLogger(opts.log ?? console)
   try {
@@ -40,7 +34,7 @@ export async function handleRetryJob(request: Request, opts: RetryOptions): Prom
       log.error('retry: CRON_SECRET is not set')
       return fail(503, 'unavailable')
     }
-    if (!authorised(request, opts.env.CRON_SECRET)) return fail(401, 'unauthorized')
+    if (!cronAuthorised(request, opts.env.CRON_SECRET)) return fail(401, 'unauthorized')
 
     const fetchImpl = opts.fetch ?? fetch
     const db = opts.db === undefined ? dbFromEnv(opts.env, fetchImpl) : opts.db

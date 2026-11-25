@@ -191,3 +191,111 @@ After deploying, check it for real:
    make another booking. The booking succeeds and its notification shows
    `failed` with an error code. Restore the token and redeploy; the next daily
    run (or Vercel > Cron Jobs > Run) sends it once.
+
+## 7. Notification settings (turn each message on or off)
+
+Every WhatsApp message the site sends is one row in the Supabase table
+**`notification_settings`**: one per **event** and **audience**. Nothing about
+which message is sent is fixed in the code.
+
+| Event | When | Sent by |
+|---|---|---|
+| `booking_received` | A patient submits the booking form | the form |
+| `booking_confirmed` | Staff set a booking's `status` to `confirmed` | Supabase webhook (below) |
+| `booking_rescheduled` | Staff set `status` to `rescheduled`, or change `scheduled_date` / `scheduled_slot` of a confirmed booking | Supabase webhook |
+| `booking_declined` | Staff set `status` to `rejected` | Supabase webhook |
+| `appointment_reminder` | `days_before` days before a confirmed or rescheduled appointment, at 09:00 India time | daily job |
+
+Audience **`admin`** is the practice: the numbers in the row's `recipients`
+(comma-separated, country code first), or `WHATSAPP_RECIPIENT_NUMBER` when
+empty. Audience **`customer`** is the patient who booked.
+
+**Columns you edit** (Supabase → Table Editor → `notification_settings`):
+
+| Column | Meaning |
+|---|---|
+| `enabled` | `true` sends it, `false` stops it at once, including retries of messages already waiting |
+| `template_name` | The approved WhatsApp template's exact name |
+| `language` | The template's language code as approved, e.g. `en` or `en_US` |
+| `parameters` | The template's body variables, in order (below) |
+| `recipients` | Admin rows only: extra or different numbers |
+| `days_before` | Reminder rows only: days before the appointment (default 1) |
+
+Two rows start **on**: the practice's new-booking alert (`new_booking_request`)
+and the patient's confirmation (`booking_confirmation`, the approved Leminai
+template: Dear {{1}}, Name {{2}}, Email {{3}}, Contact {{4}}, Preferred Date
+{{5}}, Preferred Slot {{6}}). Every other row starts **off** with a suggested
+template name: get the template approved first, put its exact name and
+language in the row, then set `enabled` to `true`. A template must exist in
+the account the provider sends from: with Leminai, create `new_booking_request`
+there too, or switch the practice row off.
+
+**`parameters`** is a list, one item per template variable, in the template's
+order: `{"source": "<field>"}` for a booking field or `{"text": "<fixed text>"}`.
+For templates with **named** variables ({{booking_id}}) add `"name"`, e.g.
+`{"source": "booking_ref", "name": "booking_id"}`. Example for a template
+"Hello {{1}}, your appointment on {{2}} is confirmed. Ref {{3}}":
+
+```json
+[{"source": "patient_first_name"}, {"source": "appointment_when"}, {"source": "booking_ref"}]
+```
+
+| Field | Example |
+|---|---|
+| `booking_ref` | AT-7K3F9Q |
+| `patient_name`, `patient_first_name` | Ravi Kumar, Ravi |
+| `patient_phone`, `patient_phone_digits`, `patient_email` | +919876543210, 919876543210, ravi@example.com (or -) |
+| `requested_date`, `requested_date_short`, `requested_time`, `requested_when` | 20 October 2026, 20 Oct 2026, Morning, 20 October 2026, Morning |
+| `appointment_date`, `appointment_time`, `appointment_when` | The scheduled date and time once staff set them, otherwise the requested ones |
+| `consultation_type` | In-person |
+| `status` | Pending, Confirmed, Rescheduled, Rejected |
+| `doctor_name`, `clinic_name`, `clinic_address`, `clinic_phone`, `website` | From the site's details |
+
+The patient's free-text message is deliberately not available. A row with an
+unknown field sends nothing; its notification shows `failed` with
+`bad_parameter_N` (N = the position of the wrong item).
+
+### Provider: Leminai or Meta
+
+`WHATSAPP_PROVIDER` chooses who sends the templates: `leminai` (the Leminai API,
+`LEMINAI_API_KEY`) or `meta` (the Meta Cloud API, `WHATSAPP_ACCESS_TOKEN` and
+`WHATSAPP_PHONE_NUMBER_ID`). When it is not set, Leminai is used if
+`LEMINAI_API_KEY` is set, otherwise Meta. Switching is one Vercel setting and a
+redeploy. The templates must be approved in the WhatsApp account the chosen
+provider sends from. (The booking assistant's text replies and delivery
+receipts still use the Meta webhook in section 2.)
+
+### Setup
+
+1. **Database:** run `supabase/migrations/20261123120000_notification_settings.sql`
+   in the SQL Editor (as in section 1). It only **adds**: the settings table
+   with its starting rows, an optional `recipient` column on `notifications`,
+   the new notification kinds, and read/insert/update access for the server.
+   It does not change or delete any booking or notification, and is safe to run
+   again (rows you edited are kept). Until it is run, the practice's
+   new-booking alert keeps working from `WHATSAPP_TEMPLATE_NAME`.
+2. **Vercel environment variables** (then redeploy):
+   - `LEMINAI_API_KEY` (secret) to send through Leminai; optional
+     `WHATSAPP_PROVIDER` and `LEMINAI_API_URL`.
+   - `BOOKING_EVENTS_SECRET` (secret): any long random text, for step 3.
+3. **Status changes → notifications** (Supabase → Database → **Webhooks** →
+   Create a new hook):
+   - Table **`appointments`**, events **Update** only.
+   - Type **HTTP Request**, method **POST**, URL
+     `https://www.drabhinavthaduri.in/api/booking-events`.
+   - HTTP header **`Authorization`** = `Bearer ` followed by the same value as
+     `BOOKING_EVENTS_SECRET`.
+   Then confirming, rescheduling or declining a booking in the Table Editor
+   sends the matching messages that are switched on. Each change is sent once,
+   even if the webhook is delivered twice.
+4. **Reminders** run daily from `vercel.json` (`/api/cron/appointment-reminders`,
+   03:30 UTC = 09:00 IST) with `CRON_SECRET`. Switch them on in the table.
+
+### Checking
+
+- `notifications`: each message is a row with `kind` (`event:audience`),
+  `recipient`, `status` (`sent`, `failed`, `skipped`) and `last_error` (codes
+  only: e.g. `turned_off`, `not_configured`, `bad_parameter_2`,
+  `leminai status 422, code …`). Failed rows are retried by the daily job.
+- To test a status message: switch its row on, then in `appointments` change a
+  test booking's `status` to `confirmed`; the patient row should show `sent`.

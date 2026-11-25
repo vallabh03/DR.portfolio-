@@ -10,8 +10,8 @@ import { createHmac } from 'node:crypto'
 import { createLimiter, handleConsultation } from '../api/consultation.ts'
 import { handleRetryJob, MAX_ATTEMPTS } from '../api/cron/retry-notifications.ts'
 import { handleWebhook, statusUpdates } from '../api/whatsapp-webhook.ts'
-import { memoryDb, supabaseDb, type MemoryDb } from '../api/_lib/db.ts'
-import { ENV, metaStub } from './helpers.ts'
+import { supabaseDb, type MemoryDb } from '../api/_lib/db.ts'
+import { ENV, metaStub, practiceOnlyDb as memoryDb } from './helpers.ts'
 
 const NOW = Date.UTC(2026, 9, 6, 12)
 const CRON_SECRET = 'cron-secret-not-real'

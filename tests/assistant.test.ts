@@ -9,8 +9,8 @@ import { createHmac } from 'node:crypto'
 import { createLimiter, handleConsultation } from '../api/consultation.ts'
 import { allowedNumbers, HELP_TEXT, LIST_LIMIT, parseCommand, replyFor } from '../api/_lib/bot.ts'
 import { handleWebhook, incomingMessages } from '../api/whatsapp-webhook.ts'
-import { memoryDb, supabaseDb, type MemoryDb } from '../api/_lib/db.ts'
-import { ENV, metaStub } from './helpers.ts'
+import { supabaseDb, type MemoryDb } from '../api/_lib/db.ts'
+import { ENV, metaStub, practiceOnlyDb as memoryDb } from './helpers.ts'
 
 // 14 October 2026, 20:00 in India (14:30 UTC).
 const NOW = Date.UTC(2026, 9, 14, 14, 30)

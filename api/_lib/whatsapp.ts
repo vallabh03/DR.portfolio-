@@ -1,17 +1,24 @@
 import type { Logger } from './http.ts'
 
 /**
- * Sends one approved template message through the Meta WhatsApp Cloud API.
- * Server-side only: the access token comes from environment variables and is
- * never returned or logged. Errors are reduced to codes, because Meta's error
- * text can echo the values that were sent.
+ * Sends approved WhatsApp template messages through one of two providers,
+ * chosen by the WHATSAPP_PROVIDER setting:
+ *
+ * - leminai: the Leminai API (POST {LEMINAI_API_URL}/messages/template).
+ * - meta: the Meta WhatsApp Cloud API directly.
+ *
+ * Server-side only: keys and tokens come from environment variables and are
+ * never returned or logged. Errors are reduced to status and error codes,
+ * because providers' error text can echo the values that were sent.
  */
 
-const META_TIMEOUT_MS = 10_000
+const TIMEOUT_MS = 10_000
 const DEFAULT_API_VERSION = 'v23.0'
+export const DEFAULT_LEMINAI_URL = 'https://app.leminai.com/api/v1'
 /** Template parameter values cannot contain line breaks, tabs or runs of four spaces, and cannot be empty. */
 const flat = (s: string) => s.replace(/\s+/g, ' ').trim() || '-'
 
+/** Meta Cloud API settings (also used by the booking assistant's text replies). */
 export type WhatsAppConfig = {
   accessToken: string
   phoneNumberId: string
@@ -19,14 +26,24 @@ export type WhatsAppConfig = {
   apiVersion?: string
 }
 
-export type SendResult = { ok: true; messageId: string } | { ok: false; error: string }
+export type ProviderConfig = ({ provider: 'meta' } & WhatsAppConfig) | { provider: 'leminai'; apiKey: string; baseUrl: string }
 
-export async function sendTemplate(
-  config: WhatsAppConfig,
-  message: { to: string; template: string; params: Record<string, string> },
-  fetchImpl: typeof fetch,
-  log: Logger,
-): Promise<SendResult> {
+/** A template message: recipient (digits, country code first), approved template name and language, and body variables in order. */
+export type TemplateMessage = { to: string; template: string; language?: string; params: { text: string; name?: string }[] }
+
+export type SendResult = { ok: true; messageId?: string } | { ok: false; error: string }
+
+const timedOut = (err: unknown) => err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+
+export function sendTemplate(config: ProviderConfig, message: TemplateMessage, fetchImpl: typeof fetch, log: Logger): Promise<SendResult> {
+  return config.provider === 'leminai' ? sendLeminai(config, message, fetchImpl, log) : sendMeta(config, message, fetchImpl, log)
+}
+
+/** Meta's template parameters: named ({{booking_id}}) when the spec names them, otherwise numbered. */
+const bodyParameters = (params: TemplateMessage['params']) =>
+  params.map((p) => (p.name ? { type: 'text', parameter_name: p.name, text: flat(p.text) } : { type: 'text', text: flat(p.text) }))
+
+async function sendMeta(config: WhatsAppConfig, message: TemplateMessage, fetchImpl: typeof fetch, log: Logger): Promise<SendResult> {
   const version = config.apiVersion && /^v\d+\.\d+$/.test(config.apiVersion) ? config.apiVersion : DEFAULT_API_VERSION
   const url = `https://graph.facebook.com/${version}/${encodeURIComponent(config.phoneNumberId)}/messages`
 
@@ -42,21 +59,15 @@ export async function sendTemplate(
         type: 'template',
         template: {
           name: message.template,
-          language: { code: config.language || 'en' },
-          components: [
-            {
-              type: 'body',
-              parameters: Object.entries(message.params).map(([parameter_name, text]) => ({ type: 'text', parameter_name, text: flat(text) })),
-            },
-          ],
+          language: { code: message.language || config.language || 'en' },
+          components: [{ type: 'body', parameters: bodyParameters(message.params) }],
         },
       }),
-      signal: AbortSignal.timeout(META_TIMEOUT_MS),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     })
   } catch (err) {
-    const timeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
-    log.error(`whatsapp: request ${timeout ? 'timed out' : 'could not connect'}`)
-    return { ok: false, error: timeout ? 'timeout' : 'network' }
+    log.error(`whatsapp: request ${timedOut(err) ? 'timed out' : 'could not connect'}`)
+    return { ok: false, error: timedOut(err) ? 'timeout' : 'network' }
   }
 
   const data = (await res.json().catch(() => null)) as {
@@ -69,6 +80,45 @@ export async function sendTemplate(
 
   const e = data?.error
   const error = `meta status ${res.status}, code ${String(e?.code ?? 'none')}, subcode ${String(e?.error_subcode ?? 'none')}, trace ${String(e?.fbtrace_id ?? 'none')}`
+  log.error(`whatsapp: message rejected (${error})`)
+  return { ok: false, error }
+}
+
+/** A message id from Leminai's answer, wherever it puts it. */
+function leminaiMessageId(data: unknown): string | undefined {
+  const d = data as Record<string, unknown> | null
+  const inner = (d?.data ?? null) as Record<string, unknown> | null
+  const messages = (d?.messages ?? inner?.messages) as { id?: unknown }[] | undefined
+  for (const v of [d?.message_id, d?.id, inner?.message_id, inner?.id, messages?.[0]?.id]) if (typeof v === 'string' && v) return v
+  return undefined
+}
+
+async function sendLeminai(config: { apiKey: string; baseUrl: string }, message: TemplateMessage, fetchImpl: typeof fetch, log: Logger): Promise<SendResult> {
+  let res: Response
+  try {
+    res = await fetchImpl(`${config.baseUrl.replace(/\/+$/, '')}/messages/template`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: message.to.replace(/\D/g, ''),
+        template_name: message.template,
+        language: message.language || 'en',
+        components: [{ type: 'body', parameters: bodyParameters(message.params) }],
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+  } catch (err) {
+    log.error(`whatsapp: Leminai request ${timedOut(err) ? 'timed out' : 'could not connect'}`)
+    return { ok: false, error: timedOut(err) ? 'timeout' : 'network' }
+  }
+
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+  const failed = !res.ok || data?.success === false || data?.ok === false || data?.status === 'error'
+  if (!failed) return { ok: true, messageId: leminaiMessageId(data) }
+
+  const e = (data?.error ?? null) as Record<string, unknown> | string | null
+  const code = typeof e === 'object' && e ? (e.code ?? e.status) : (data?.code ?? data?.error_code)
+  const error = `leminai status ${res.status}, code ${typeof code === 'string' || typeof code === 'number' ? String(code) : 'none'}`
   log.error(`whatsapp: message rejected (${error})`)
   return { ok: false, error }
 }
@@ -91,7 +141,7 @@ export async function sendText(config: WhatsAppConfig, message: { to: string; bo
       method: 'POST',
       headers: { Authorization: `Bearer ${config.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: message.to.replace(/\D/g, ''), type: 'text', text: { preview_url: false, body } }),
-      signal: AbortSignal.timeout(META_TIMEOUT_MS),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     })
   } catch (err) {
     const timeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
