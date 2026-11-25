@@ -299,3 +299,25 @@ receipts still use the Meta webhook in section 2.)
   `leminai status 422, code …`). Failed rows are retried by the daily job.
 - To test a status message: switch its row on, then in `appointments` change a
   test booking's `status` to `confirmed`; the patient row should show `sent`.
+
+### The doctor's Confirm button (Leminai)
+
+When the doctor taps **Confirm** on a booking alert in WhatsApp, the booking
+becomes `confirmed` and the patient gets the `booking_confirmed` messages
+switched on in `notification_settings`, the same as confirming it in Supabase.
+
+Setup:
+
+1. Vercel: add `LEMINAI_WEBHOOK_TOKEN` (secret): any long random text. Redeploy.
+2. Leminai → **Settings → Webhook** → "WhatsApp received data will be resend
+   to": `https://www.drabhinavthaduri.in/api/leminai-webhook?token=` followed by
+   the same text. **Save Changes**.
+
+How the booking is found: the tap carries the WhatsApp id of the alert it was
+tapped on, which was saved when the alert was sent. Alerts sent before this
+version may have no saved id; then the tap is used only if exactly one booking
+alerted to that number is still pending. Only the practice's numbers (the
+`booking_received` admin row's recipients, else `WHATSAPP_RECIPIENT_NUMBER`) can
+confirm, only a pending booking changes, and a second tap changes nothing.
+"Reschedule" taps are ignored. Vercel's logs show each outcome
+(`leminai-webhook: …`), never numbers or names.
