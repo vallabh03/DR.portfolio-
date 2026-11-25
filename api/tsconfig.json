@@ -1,7 +1,11 @@
 {
-  // Settings for the server functions in api/, which Vercel type-checks on its
-  // own with the nearest tsconfig.json. Without this file it uses the root one,
-  // which is for the browser app and asks for Vite's client types.
+  // Settings for the server functions in api/, which Vercel compiles on its
+  // own with the nearest tsconfig.json. Vercel compiles them where the
+  // project's type packages (@types/node, vite/client) cannot be found, so
+  // naming any here only logs "TS2688: Cannot find type definition file".
+  // No type packages are named; the full type check of api/ (with Node types)
+  // is tsconfig.server.json, run by `npm run build` and in tests.
   "extends": "../tsconfig.server.json",
+  "compilerOptions": { "types": [] },
   "include": [".", "../src/data"]
 }
