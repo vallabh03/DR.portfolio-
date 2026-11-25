@@ -246,7 +246,7 @@ For templates with **named** variables ({{booking_id}}) add `"name"`, e.g.
 | `patient_name`, `patient_first_name` | Ravi Kumar, Ravi |
 | `patient_phone`, `patient_phone_digits`, `patient_email` | +919876543210, 919876543210, ravi@example.com (or -) |
 | `requested_date`, `requested_date_short`, `requested_time`, `requested_when` | 20 October 2026, 20 Oct 2026, Morning, 20 October 2026, Morning |
-| `appointment_date`, `appointment_time`, `appointment_when` | The scheduled date and time once staff set them, otherwise the requested ones |
+| `appointment_date`, `appointment_date_short`, `appointment_time`, `appointment_when` | The scheduled date and time once staff set them, otherwise the requested ones (`appointment_date_short`: 26 Nov 2026) |
 | `consultation_type` | In-person |
 | `status` | Pending, Confirmed, Rescheduled, Rejected |
 | `doctor_name`, `clinic_name`, `clinic_address`, `clinic_phone`, `website` | From the site's details |

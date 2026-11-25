@@ -247,6 +247,22 @@ test('confirming a booking sends the confirmation once, however often the webhoo
   assert.equal(again.sent.length, 0)
 })
 
+test('the patient confirmation can use the confirmed date in short form', async () => {
+  const db = memoryDb(() => NOW)
+  turnOn(db, 'booking_confirmed', 'customer', {
+    template_name: 'booking_confirmation',
+    parameters: ['patient_first_name', 'patient_name', 'patient_email', 'patient_phone_digits', 'appointment_date_short', 'appointment_time'].map((source) => ({ source })),
+  })
+  const { booking } = await book(db)
+  const { sent } = await changed(db, booking, { status: 'confirmed', scheduled_date: '2026-11-26', scheduled_slot: 'midday' })
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].body.to, PATIENT)
+  assert.deepEqual(
+    sent[0].body.template.components[0].parameters.map((p: { text: string }) => p.text),
+    ['Ravi', 'Ravi Kumar', '-', '919876543210', '26 Nov 2026', 'Midday'],
+  )
+})
+
 test('a new date for a confirmed booking is a new reschedule message; other edits send nothing', async () => {
   const db = memoryDb(() => NOW)
   turnOn(db, 'booking_rescheduled', 'customer')

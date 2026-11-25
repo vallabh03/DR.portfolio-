@@ -92,6 +92,8 @@ export const PARAMETER_SOURCES: Record<string, (a: Appointment) => string> = {
   requested_time: (a) => SLOT_LABELS[a.requested_slot],
   requested_when: (a) => formatWhen(a.requested_date, a.requested_slot),
   appointment_date: (a) => formatDate(appointmentDate(a)),
+  /** "26 Nov 2026": the scheduled date once staff set it, otherwise the requested one */
+  appointment_date_short: (a) => shortDate(appointmentDate(a)),
   appointment_time: (a) => SLOT_LABELS[appointmentSlot(a)],
   appointment_when: (a) => formatWhen(appointmentDate(a), appointmentSlot(a)),
   consultation_type: (a) => TYPE_LABELS[a.consultation_type],
