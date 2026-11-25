@@ -41,6 +41,15 @@ export interface BookingDb {
   notificationSettings(event: EventName): Promise<NotificationSetting[]>
   /** Confirmed or rescheduled bookings whose appointment (scheduled date, else requested date) is on `date` (YYYY-MM-DD). */
   appointmentsOn(date: string, limit: number): Promise<Appointment[]>
+  /** The notification sent as this WhatsApp message (the provider's message id), or null. */
+  notificationByMessageId(messageId: string): Promise<Notification | null>
+  /** Notifications of `kind` sent to `recipient` since `since` (ISO), newest first. */
+  sentTo(recipient: string, kind: string, since: string, limit: number): Promise<Notification[]>
+  /**
+   * Confirms a booking for its requested date and time, but only if it is still
+   * pending and unchanged since it was read (`version`); null otherwise.
+   */
+  confirmPending(a: Appointment): Promise<Appointment | null>
 }
 
 export class DbError extends Error {
@@ -140,6 +149,27 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
       (await call<Appointment[]>(
         `/rest/v1/appointments?status=in.(confirmed,rescheduled)&or=(scheduled_date.eq.${date},and(scheduled_date.is.null,requested_date.eq.${date}))&order=created_at.asc&limit=${limit}&select=*`,
       )) ?? [],
+    notificationByMessageId: (messageId) => one<Notification>(`/rest/v1/notifications?meta_message_id=${eq(messageId)}&select=*`),
+    sentTo: async (recipient, kind, since, limit) =>
+      (await call<Notification[]>(
+        `/rest/v1/notifications?recipient=${eq(recipient)}&kind=${eq(kind)}&status=eq.sent&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=${limit}&select=*`,
+      )) ?? [],
+    async confirmPending(a) {
+      // Changes the row only if it is still pending at the version that was read, so a
+      // second tap, a repeated webhook or a change made meanwhile in the dashboard wins.
+      const rows = await call<Appointment[]>(`/rest/v1/appointments?id=${eq(a.id)}&status=eq.pending&status_version=eq.${a.status_version}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          status: 'confirmed',
+          scheduled_date: a.requested_date,
+          scheduled_slot: a.requested_slot,
+          status_version: a.status_version + 1,
+          status_changed_at: new Date().toISOString(),
+        }),
+      })
+      return rows?.[0] ?? null
+    },
   }
 }
 
@@ -288,5 +318,21 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
         .sort((x, y) => x.createdAt - y.createdAt)
         .slice(0, limit)
         .map(copy),
+    notificationByMessageId: async (messageId) => {
+      const n = [...notifications.values()].find((x) => x.meta_message_id === messageId)
+      return n ? copy(n) : null
+    },
+    sentTo: async (recipient, kind, since, limit) =>
+      [...notifications.values()]
+        .filter((n) => n.recipient === recipient && n.kind === kind && n.status === 'sent' && n.createdAt >= Date.parse(since))
+        .sort((x, y) => y.createdAt - x.createdAt)
+        .slice(0, limit)
+        .map(copy),
+    async confirmPending(read) {
+      const a = appointments.get(read.id)
+      if (!a || a.status !== 'pending' || a.status_version !== read.status_version) return null
+      Object.assign(a, { status: 'confirmed', scheduled_date: a.requested_date, scheduled_slot: a.requested_slot, status_version: a.status_version + 1 })
+      return copy(a)
+    },
   }
 }

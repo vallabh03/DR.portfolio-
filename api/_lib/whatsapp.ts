@@ -85,11 +85,20 @@ async function sendMeta(config: WhatsAppConfig, message: TemplateMessage, fetchI
 }
 
 /** A message id from Leminai's answer, wherever it puts it. */
-function leminaiMessageId(data: unknown): string | undefined {
+/**
+ * The message id from Leminai's answer. Prefers the WhatsApp message id
+ * (WAMID): a button tap on the message refers back to it. Leminai's own
+ * numeric message_id is the fallback.
+ */
+export function leminaiMessageId(data: unknown): string | undefined {
   const d = data as Record<string, unknown> | null
   const inner = (d?.data ?? null) as Record<string, unknown> | null
   const messages = (d?.messages ?? inner?.messages) as { id?: unknown }[] | undefined
-  for (const v of [d?.message_id, d?.id, inner?.message_id, inner?.id, messages?.[0]?.id]) if (typeof v === 'string' && v) return v
+  const wamids = [d?.wamid, inner?.wamid, d?.whatsapp_message_id, inner?.whatsapp_message_id, messages?.[0]?.id]
+  for (const v of [...wamids, d?.message_id, inner?.message_id, d?.id, inner?.id]) {
+    if (typeof v === 'string' && v) return v
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  }
   return undefined
 }
 

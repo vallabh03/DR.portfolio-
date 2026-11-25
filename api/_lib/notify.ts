@@ -34,6 +34,7 @@ export type ServerEnv = Partial<
     | 'WHATSAPP_WEBHOOK_VERIFY_TOKEN'
     | 'CRON_SECRET'
     | 'BOOKING_EVENTS_SECRET'
+    | 'LEMINAI_WEBHOOK_TOKEN'
     | 'WHATSAPP_ALLOWED_NUMBERS'
     | 'ALLOWED_ORIGINS',
     string | undefined
