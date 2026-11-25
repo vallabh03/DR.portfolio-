@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto'
+
 /**
  * Small helpers shared by the server functions in api/. Files in api/_lib are
  * not turned into endpoints (Vercel skips paths that start with an underscore).
@@ -70,6 +72,13 @@ export async function readJson(request: Request, allowedOrigins?: string): Promi
   } catch {
     return { response: fail(400, 'bad_request') }
   }
+}
+
+/** True when the request carries "Authorization: Bearer <secret>" (scheduled jobs and the Supabase webhook). Constant-time comparison. */
+export function cronAuthorised(request: Request, secret: string) {
+  const expected = Buffer.from(`Bearer ${secret}`)
+  const given = Buffer.from(request.headers.get('authorization') ?? '')
+  return given.length === expected.length && timingSafeEqual(given, expected)
 }
 
 /** The bearer token from an Authorization header, if any. */

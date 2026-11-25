@@ -1,6 +1,9 @@
 {
   "cleanUrls": true,
-  "crons": [{ "path": "/api/cron/retry-notifications", "schedule": "0 3 * * *" }],
+  "crons": [
+    { "path": "/api/cron/retry-notifications", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/appointment-reminders", "schedule": "30 3 * * *" }
+  ],
   "trailingSlash": false,
   "redirects": [
     {

@@ -1,4 +1,5 @@
 import type { Appointment, BookingInput, Notification, NotificationKind, NotificationStatus } from './booking.ts'
+import { DEFAULT_SETTINGS, type EventName, type NotificationSetting } from './events.ts'
 
 /**
  * The storage the server functions need, as one small interface with two
@@ -19,8 +20,8 @@ export type FinishUpdate = { status: Extract<NotificationStatus, 'sent' | 'faile
 
 export interface BookingDb {
   createBooking(requestId: string, fingerprint: string, input: BookingInput, maxPerPhonePerDay: number): Promise<CreateResult>
-  /** The notification for this event, created if it does not exist yet. */
-  ensureNotification(appointmentId: string, kind: NotificationKind, idempotencyKey: string): Promise<Notification>
+  /** The notification for this event, created if it does not exist yet. `recipient`: digits only, country code first. */
+  ensureNotification(appointmentId: string, kind: NotificationKind, idempotencyKey: string, recipient?: string): Promise<Notification>
   /** Marks a waiting, failed or stale notification as sending; null when it is not available to send. */
   claimNotification(id: string, staleSeconds: number): Promise<Notification | null>
   finishNotification(id: string, update: FinishUpdate): Promise<void>
@@ -36,6 +37,10 @@ export interface BookingDb {
   pendingBookings(limit: number): Promise<Appointment[]>
   /** One booking by its reference (e.g. AT-7K3F9Q), or null. */
   bookingByRef(ref: string): Promise<Appointment | null>
+  /** The notification settings for an event (public.notification_settings), switched on or off. */
+  notificationSettings(event: EventName): Promise<NotificationSetting[]>
+  /** Confirmed or rescheduled bookings whose appointment (scheduled date, else requested date) is on `date` (YYYY-MM-DD). */
+  appointmentsOn(date: string, limit: number): Promise<Appointment[]>
 }
 
 export class DbError extends Error {
@@ -79,11 +84,11 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
         p_max_per_phone_per_day: max,
       }),
 
-    async ensureNotification(appointmentId, kind, key) {
+    async ensureNotification(appointmentId, kind, key, recipient) {
       await call('/rest/v1/notifications?on_conflict=idempotency_key', {
         method: 'POST',
         headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
-        body: JSON.stringify({ appointment_id: appointmentId, kind, idempotency_key: key }),
+        body: JSON.stringify({ appointment_id: appointmentId, kind, idempotency_key: key, recipient: recipient ?? null }),
       })
       const row = await one<Notification>(`/rest/v1/notifications?idempotency_key=${eq(key)}&select=*`)
       if (!row) throw new DbError(404)
@@ -102,7 +107,8 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
         body: JSON.stringify({
           status: u.status,
           last_error: u.status === 'sent' ? null : (u.error ?? null),
-          ...(u.messageId && { meta_message_id: u.messageId, sent_at: new Date().toISOString(), delivery_status: 'sent' }),
+          ...(u.status === 'sent' && { sent_at: new Date().toISOString() }),
+          ...(u.messageId && { meta_message_id: u.messageId, delivery_status: 'sent' }),
         }),
       })
     },
@@ -129,6 +135,11 @@ export function supabaseDb(url: string, serviceKey: string, fetchImpl: typeof fe
       )) ?? [],
     pendingBookings: async (limit) => (await call<Appointment[]>(`/rest/v1/appointments?status=eq.pending&order=created_at.desc&limit=${limit}&select=*`)) ?? [],
     bookingByRef: (ref) => one<Appointment>(`/rest/v1/appointments?booking_ref=${eq(ref)}&select=*`),
+    notificationSettings: async (event) => (await call<NotificationSetting[]>(`/rest/v1/notification_settings?event=${eq(event)}&select=*`)) ?? [],
+    appointmentsOn: async (date, limit) =>
+      (await call<Appointment[]>(
+        `/rest/v1/appointments?status=in.(confirmed,rescheduled)&or=(scheduled_date.eq.${date},and(scheduled_date.is.null,requested_date.eq.${date}))&order=created_at.asc&limit=${limit}&select=*`,
+      )) ?? [],
   }
 }
 
@@ -139,6 +150,8 @@ type MemoryNotification = Notification & { updatedAt: number; createdAt: number 
 export type MemoryDb = BookingDb & {
   appointments: Map<string, Appointment>
   notifications: Map<string, MemoryNotification>
+  /** The notification settings table; tests and local trials may change it. */
+  settings: NotificationSetting[]
 }
 
 export function memoryDb(now: () => number = Date.now): MemoryDb {
@@ -154,9 +167,12 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
   const copy = <T>(v: T): T => structuredClone(v)
   const DAY = 86_400_000
 
+  const settings = structuredClone(DEFAULT_SETTINGS)
+
   return {
     appointments,
     notifications,
+    settings,
 
     async createBooking(requestId, fingerprint, i, max) {
       const all = [...appointments.values()]
@@ -193,7 +209,7 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
       return { result: 'created', appointment: copy(a) }
     },
 
-    async ensureNotification(appointmentId, kind, key) {
+    async ensureNotification(appointmentId, kind, key, recipient) {
       const found = [...notifications.values()].find((n) => n.idempotency_key === key)
       if (found) return copy(found)
       const n: MemoryNotification = {
@@ -201,6 +217,7 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
         appointment_id: appointmentId,
         kind,
         idempotency_key: key,
+        recipient: recipient ?? null,
         status: 'pending',
         attempts: 0,
         last_error: null,
@@ -230,7 +247,8 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
         status: u.status,
         last_error: u.status === 'sent' ? null : (u.error ?? null),
         updatedAt: now(),
-        ...(u.messageId && { meta_message_id: u.messageId, sent_at: new Date(now()).toISOString(), delivery_status: 'sent' }),
+        ...(u.status === 'sent' && { sent_at: new Date(now()).toISOString() }),
+        ...(u.messageId && { meta_message_id: u.messageId, delivery_status: 'sent' }),
       })
     },
 
@@ -263,5 +281,12 @@ export function memoryDb(now: () => number = Date.now): MemoryDb {
       const a = [...appointments.values()].find((x) => x.booking_ref === ref)
       return a ? copy(a) : null
     },
+    notificationSettings: async (event) => settings.filter((x) => x.event === event).map(copy),
+    appointmentsOn: async (date, limit) =>
+      [...appointments.values()]
+        .filter((a) => (a.status === 'confirmed' || a.status === 'rescheduled') && (a.scheduled_date ?? a.requested_date) === date)
+        .sort((x, y) => x.createdAt - y.createdAt)
+        .slice(0, limit)
+        .map(copy),
   }
 }

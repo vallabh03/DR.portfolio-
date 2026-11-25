@@ -2,8 +2,9 @@
  * POST /api/consultation  (Vercel Function, server-side only)
  *
  * Receives a booking from the website form, validates it again on the server,
- * saves it in the database as Pending, and then notifies the doctor on WhatsApp
- * through the Meta WhatsApp Cloud API (approved template).
+ * saves it in the database as Pending, and then sends the "booking received"
+ * WhatsApp notifications switched on in public.notification_settings (the
+ * practice, and optionally the patient; see api/_lib/events.ts).
  *
  * Order matters: the booking is saved first and the visitor gets a booking
  * reference even if WhatsApp is down. A failed notification stays in the
@@ -19,7 +20,7 @@
 import { isOfferedType, isSlot, OFFERED_TYPES, type BookingInput } from './_lib/booking.ts'
 import { MAX_DAYS_AHEAD } from '../src/data/booking.ts'
 import { createRateLimiter, clientIp, fail, rateLimited, readJson, reply, safeLogger, sha256Hex, type Logger, type RateLimiter } from './_lib/http.ts'
-import { dbFromEnv, deliverNotification, type ServerEnv } from './_lib/notify.ts'
+import { dbFromEnv, notifyEvent, type ServerEnv } from './_lib/notify.ts'
 import { DbError, type BookingDb, type CreateResult } from './_lib/db.ts'
 
 const RATE_LIMIT_MAX = 5
@@ -188,18 +189,14 @@ async function handle(request: Request, opts: Options, log: Logger): Promise<Res
   const appointment = created.appointment
   log.info(`consultation: booking ${created.result === 'created' ? 'saved' : 'already saved (repeat)'}`)
 
-  // 2. Notify the doctor, once. A repeat request only retries a notification that has not been sent.
-  let notified = false
+  // 2. Send the "booking received" notifications, once each. A repeat request only retries those not yet sent.
   try {
-    const notification = await db.ensureNotification(appointment.id, 'doctor_new', `${appointment.id}:doctor_new`)
-    const outcome = await deliverNotification(db, notification.id, appointment, { env, fetch: fetchImpl, log })
-    notified = outcome === 'sent' || outcome === 'already_sent'
+    const counts = await notifyEvent(db, 'booking_received', appointment, { env, fetch: fetchImpl, log })
+    log.info(`consultation: notifications ${counts.sent} sent, ${counts.failed} failed (saved for retry), ${counts.skipped} skipped`)
   } catch (err) {
-    // The booking is saved; the daily retry job will try the notification again.
-    log.error(`consultation: doctor notification error (${err instanceof Error ? err.name : 'unknown'})`)
+    // The booking is saved; the daily retry job will try failed notifications again.
+    log.error(`consultation: notification error (${err instanceof Error ? err.name : 'unknown'})`)
   }
-
-  log.info(`consultation: doctor notification ${notified ? 'sent' : 'not sent; saved for retry'}`)
   return reply(created.result === 'created' ? 201 : 200, { ok: true, bookingRef: appointment.booking_ref, status: 'pending' })
 }
 
